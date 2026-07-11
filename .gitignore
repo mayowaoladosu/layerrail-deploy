@@ -6,6 +6,14 @@
 !.env.example
 !.env.dev.example
 !.env.prod.example
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
+!.ruby-version
+!apps/control_plane/.gitignore
+!apps/control_plane/.dockerignore
+!apps/control_plane/.rubocop.yml
+!apps/control_plane/.rspec
 
 # Python
 __pycache__/
@@ -24,6 +32,10 @@ supervisord.pid
 # Node
 node_modules/
 package-lock.json
+
+# Ruby
+.bundle/
+vendor/bundle/
 
 # Terraform
 terraform.tfstate

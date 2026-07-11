@@ -1,1 +1,7 @@
 *.sh text eol=lf
+*.rb text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Gemfile text eol=lf
+Gemfile.lock text eol=lf
+.ruby-version text eol=lf
