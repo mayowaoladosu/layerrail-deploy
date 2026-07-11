@@ -10,6 +10,7 @@
 !.github/workflows/
 !.github/workflows/*.yml
 !.ruby-version
+!.keep
 !apps/control_plane/.gitignore
 !apps/control_plane/.dockerignore
 !apps/control_plane/.rubocop.yml

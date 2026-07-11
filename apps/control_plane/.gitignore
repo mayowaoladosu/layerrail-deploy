@@ -1,0 +1,15 @@
+/.bundle/
+/config/master.key
+/config/credentials/*.key
+/log/*
+/storage/*
+/tmp/*
+/vendor/bundle/
+
+!/log/.keep
+!/storage/.keep
+!/tmp/.keep
+!/tmp/pids/
+!/tmp/pids/.keep
+!/tmp/storage/
+!/tmp/storage/.keep

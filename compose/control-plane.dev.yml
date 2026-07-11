@@ -1,0 +1,51 @@
+services:
+  control-plane:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.control-plane.dev
+      args:
+        APP_UID: ${SERVICE_UID:-1000}
+        APP_GID: ${SERVICE_GID:-1000}
+    entrypoint: /entrypoint.control-plane.dev.sh
+    command: bundle exec rails server --binding 0.0.0.0 --port 3000
+    restart: unless-stopped
+    depends_on:
+      - pgsql
+    networks:
+      - default
+      - internal
+    env_file:
+      - ${DATA_DIR:-../data}/.env
+    environment:
+      RAILS_ENV: development
+      RAILS_LOG_TO_STDOUT: "true"
+      XDG_CACHE_HOME: /tmp/cache
+      POSTGRES_HOST: pgsql
+      POSTGRES_PORT: 5432
+      CONTROL_PLANE_DATABASE: ${CONTROL_PLANE_DATABASE:-lrail_control_plane_development}
+      CONTROL_PLANE_TEST_DATABASE: ${CONTROL_PLANE_TEST_DATABASE:-lrail_control_plane_test}
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - ${APP_DIR:-..}/apps/control_plane:/rails
+      - control-plane-log:/rails/log
+      - control-plane-storage:/rails/storage
+      - control-plane-tmp:/rails/tmp
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.control-plane.rule=Host(`control.localhost`)"
+      - "traefik.http.routers.control-plane.entrypoints=web"
+      - "traefik.http.routers.control-plane.priority=20"
+      - "traefik.http.services.control-plane.loadbalancer.server.port=3000"
+      - "traefik.docker.network=devpush_default"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  control-plane-log:
+  control-plane-storage:
+  control-plane-tmp:

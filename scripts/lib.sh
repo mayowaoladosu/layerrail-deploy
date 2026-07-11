@@ -630,6 +630,9 @@ set_compose_base() {
     COMPOSE_ARGS+=(-f "$APP_DIR/compose/ssl-${ssl}.yml")
   else
     COMPOSE_ARGS+=(-f "$APP_DIR/compose/override.dev.yml")
+    if [[ -f "$APP_DIR/compose/control-plane.dev.yml" ]]; then
+      COMPOSE_ARGS+=(-f "$APP_DIR/compose/control-plane.dev.yml")
+    fi
   fi
 
   COMPOSE_BASE=("${COMPOSE_BIN[@]}")

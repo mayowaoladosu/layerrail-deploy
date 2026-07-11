@@ -1,0 +1,37 @@
+FROM ruby:3.4.10-slim
+
+ARG APP_UID=1000
+ARG APP_GID=1000
+
+# Install development and runtime dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        libpq-dev \
+        libvips \
+        libyaml-dev \
+        postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN if ! getent group "${APP_GID}" >/dev/null; then addgroup --gid "${APP_GID}" appgroup; fi \
+    && adduser --uid "${APP_UID}" --gid "${APP_GID}" --system --home /rails appuser
+
+WORKDIR /rails
+
+# Install application dependencies
+COPY apps/control_plane/Gemfile apps/control_plane/Gemfile.lock ./
+RUN bundle install
+
+# Prepare writable runtime directories
+RUN mkdir -p log storage tmp/pids tmp/storage \
+    && chown -R "${APP_UID}:${APP_GID}" /rails /usr/local/bundle
+
+ENV HOME=/rails
+
+USER appuser
+
+EXPOSE 3000
+
+COPY --chmod=0755 docker/entrypoint.control-plane.dev.sh /entrypoint.control-plane.dev.sh

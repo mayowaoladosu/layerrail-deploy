@@ -10,6 +10,7 @@ docker/
 !docker/entrypoint.worker-jobs.dev.sh
 !docker/entrypoint.worker-monitor.sh
 !docker/entrypoint.worker-monitor.dev.sh
+!docker/entrypoint.control-plane.dev.sh
 
 # Python
 __pycache__/
