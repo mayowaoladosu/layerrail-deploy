@@ -46,6 +46,9 @@ Rails.application.configure do
   # Raise an error on page load if there are pending migrations.
   config.active_record.migration_error = :page_load
 
+  # The Windows source mount is read-only to the non-root runtime user.
+  config.active_record.dump_schema_after_migration = false
+
   # Highlight code that triggered database queries in logs.
   config.active_record.verbose_query_logs = true
 
