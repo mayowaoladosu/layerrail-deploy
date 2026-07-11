@@ -11,6 +11,8 @@ class Project < ApplicationRecord
   belongs_to :organization
   has_many :environments, dependent: :restrict_with_exception
   has_many :configuration_versions, dependent: :restrict_with_exception
+  has_many :configuration_snapshots, dependent: :restrict_with_exception
+  has_many :deployments, dependent: :restrict_with_exception
   has_many :services, dependent: :restrict_with_exception
 
   enum :lifecycle_state, LIFECYCLE_STATES, prefix: true, validate: true

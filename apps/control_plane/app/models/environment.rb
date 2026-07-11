@@ -7,6 +7,8 @@ class Environment < ApplicationRecord
 
   belongs_to :project
   has_many :configuration_versions, dependent: :restrict_with_exception
+  has_many :configuration_snapshots, dependent: :restrict_with_exception
+  has_many :deployments, dependent: :restrict_with_exception
 
   delegate :organization, :organization_id, to: :project
 

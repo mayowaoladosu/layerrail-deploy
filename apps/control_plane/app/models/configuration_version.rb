@@ -4,6 +4,16 @@ class ConfigurationVersion < ApplicationRecord
   belongs_to :environment
   belongs_to :service, optional: true
   belongs_to :created_by, class_name: "User"
+  has_many :project_configuration_snapshots,
+    class_name: "ConfigurationSnapshot",
+    foreign_key: :project_configuration_version_id,
+    dependent: :restrict_with_exception,
+    inverse_of: :project_configuration_version
+  has_many :service_configuration_snapshots,
+    class_name: "ConfigurationSnapshot",
+    foreign_key: :service_configuration_version_id,
+    dependent: :restrict_with_exception,
+    inverse_of: :service_configuration_version
 
   encrypts :payload_json
 

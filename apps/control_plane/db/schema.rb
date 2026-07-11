@@ -10,9 +10,29 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_212000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "configuration_snapshots", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id", null: false
+    t.uuid "environment_id", null: false
+    t.jsonb "key_summary", null: false
+    t.uuid "organization_id", null: false
+    t.string "payload_digest", limit: 64, null: false
+    t.text "payload_json", null: false
+    t.uuid "project_configuration_version_id"
+    t.uuid "project_id", null: false
+    t.uuid "service_configuration_version_id"
+    t.uuid "service_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_by_id"], name: "index_configuration_snapshots_on_created_by_id"
+    t.index ["id", "organization_id", "project_id", "environment_id", "service_id"], name: "index_configuration_snapshots_on_tenant_resource_identity", unique: true
+    t.index ["service_id", "environment_id", "created_at"], name: "idx_on_service_id_environment_id_created_at_d37534e42d"
+    t.check_constraint "jsonb_typeof(key_summary) = 'array'::text", name: "configuration_snapshots_key_summary_array"
+    t.check_constraint "payload_digest::text ~ '^[0-9a-f]{64}$'::text", name: "configuration_snapshots_digest_format"
+  end
 
   create_table "configuration_versions", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -29,12 +49,63 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_212000) do
     t.integer "version", null: false
     t.index ["created_by_id"], name: "index_configuration_versions_on_created_by_id"
     t.index ["environment_id", "scope_key", "version"], name: "index_configuration_versions_on_environment_scope_version", unique: true
+    t.index ["id", "project_id", "environment_id"], name: "index_configuration_versions_on_resource_identity", unique: true
     t.index ["organization_id", "project_id", "environment_id"], name: "index_configuration_versions_on_tenant_scope"
     t.index ["service_id", "environment_id"], name: "index_configuration_versions_on_service_id_and_environment_id"
     t.check_constraint "jsonb_typeof(key_summary) = 'array'::text", name: "configuration_versions_key_summary_array"
     t.check_constraint "payload_digest::text ~ '^[0-9a-f]{64}$'::text", name: "configuration_versions_digest_format"
     t.check_constraint "service_id IS NULL AND scope_key::text = 'project'::text OR service_id IS NOT NULL AND scope_key::text = ('service:'::text || service_id::text)", name: "configuration_versions_scope_matches_service"
     t.check_constraint "version > 0", name: "configuration_versions_version_positive"
+  end
+
+  create_table "deployment_transitions", id: :uuid, default: nil, force: :cascade do |t|
+    t.uuid "actor_id"
+    t.string "actor_type", limit: 16, null: false
+    t.string "cause", limit: 120, null: false
+    t.datetime "created_at", null: false
+    t.uuid "deployment_id", null: false
+    t.jsonb "error", default: {}, null: false
+    t.string "from_status", limit: 32
+    t.datetime "occurred_at", null: false
+    t.integer "sequence", null: false
+    t.string "to_status", limit: 32, null: false
+    t.datetime "updated_at", null: false
+    t.index ["deployment_id", "sequence"], name: "index_deployment_transitions_on_deployment_id_and_sequence", unique: true
+    t.index ["deployment_id"], name: "index_deployment_transitions_on_deployment_id"
+    t.check_constraint "actor_type::text = 'user'::text OR actor_type::text = 'system'::text", name: "deployment_transitions_actor_type_allowed"
+    t.check_constraint "jsonb_typeof(error) = 'object'::text", name: "deployment_transitions_error_object"
+    t.check_constraint "sequence > 0", name: "deployment_transitions_sequence_positive"
+  end
+
+  create_table "deployments", id: :uuid, default: nil, force: :cascade do |t|
+    t.jsonb "build_settings_snapshot", null: false
+    t.string "conclusion", limit: 32
+    t.uuid "configuration_snapshot_id", null: false
+    t.uuid "correlation_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "environment_id", null: false
+    t.string "idempotency_key", limit: 255, null: false
+    t.integer "lock_version", default: 0, null: false
+    t.uuid "organization_id", null: false
+    t.uuid "project_id", null: false
+    t.jsonb "runtime_policy_snapshot", null: false
+    t.uuid "service_id", null: false
+    t.string "source_digest", limit: 64, null: false
+    t.jsonb "source_snapshot", null: false
+    t.string "status", limit: 32, null: false
+    t.string "trigger", limit: 32, null: false
+    t.datetime "updated_at", null: false
+    t.index ["correlation_id"], name: "index_deployments_on_correlation_id", unique: true
+    t.index ["organization_id", "idempotency_key"], name: "index_deployments_on_organization_id_and_idempotency_key", unique: true
+    t.index ["organization_id", "status", "created_at"], name: "index_deployments_on_organization_id_and_status_and_created_at"
+    t.index ["service_id", "environment_id", "created_at"], name: "idx_on_service_id_environment_id_created_at_858be4d753"
+    t.check_constraint "conclusion IS NULL OR conclusion::text = 'succeeded'::text OR conclusion::text = 'failed'::text OR conclusion::text = 'canceled'::text", name: "deployments_conclusion_allowed"
+    t.check_constraint "jsonb_typeof(build_settings_snapshot) = 'object'::text", name: "deployments_build_settings_snapshot_object"
+    t.check_constraint "jsonb_typeof(runtime_policy_snapshot) = 'object'::text", name: "deployments_runtime_policy_snapshot_object"
+    t.check_constraint "jsonb_typeof(source_snapshot) = 'object'::text", name: "deployments_source_snapshot_object"
+    t.check_constraint "source_digest::text ~ '^[0-9a-f]{64}$'::text", name: "deployments_source_digest_format"
+    t.check_constraint "status::text = 'created'::text OR status::text = 'queued'::text OR status::text = 'preparing'::text OR status::text = 'building'::text OR status::text = 'scanning'::text OR status::text = 'deploying'::text OR status::text = 'verifying'::text OR status::text = 'ready'::text OR status::text = 'promoted'::text OR status::text = 'superseded'::text OR status::text = 'canceling'::text OR status::text = 'canceled'::text OR status::text = 'failed'::text", name: "deployments_status_allowed"
+    t.check_constraint "trigger::text = 'manual'::text OR trigger::text = 'webhook'::text OR trigger::text = 'redeploy'::text OR trigger::text = 'rollback'::text", name: "deployments_trigger_allowed"
   end
 
   create_table "environments", id: :uuid, default: nil, force: :cascade do |t|
@@ -220,10 +291,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_212000) do
     t.check_constraint "email::text = lower(btrim(email::text))", name: "users_email_normalized"
   end
 
+  add_foreign_key "configuration_snapshots", "configuration_versions", column: ["project_configuration_version_id", "project_id", "environment_id"], primary_key: ["id", "project_id", "environment_id"], on_delete: :restrict
+  add_foreign_key "configuration_snapshots", "configuration_versions", column: ["service_configuration_version_id", "project_id", "environment_id"], primary_key: ["id", "project_id", "environment_id"], on_delete: :restrict
+  add_foreign_key "configuration_snapshots", "environments", column: ["environment_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "configuration_snapshots", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
+  add_foreign_key "configuration_snapshots", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "configuration_snapshots", "users", column: "created_by_id", on_delete: :restrict
   add_foreign_key "configuration_versions", "environments", column: ["environment_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
   add_foreign_key "configuration_versions", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "configuration_versions", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
   add_foreign_key "configuration_versions", "users", column: "created_by_id", on_delete: :restrict
+  add_foreign_key "deployment_transitions", "deployments", on_delete: :restrict
+  add_foreign_key "deployments", "configuration_snapshots", column: ["configuration_snapshot_id", "organization_id", "project_id", "environment_id", "service_id"], primary_key: ["id", "organization_id", "project_id", "environment_id", "service_id"], on_delete: :restrict
+  add_foreign_key "deployments", "environments", column: ["environment_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "deployments", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
+  add_foreign_key "deployments", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
   add_foreign_key "environments", "projects", on_delete: :restrict
   add_foreign_key "git_installations", "organizations", on_delete: :restrict
   add_foreign_key "git_webhook_inboxes", "git_installations", column: ["git_installation_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
