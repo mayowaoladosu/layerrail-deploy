@@ -447,7 +447,7 @@ components:
 
     Service:
       type: object
-      required: [id, organization_id, project_id, name, workload_type, created_at]
+      required: [id, organization_id, project_id, name, workload_type, source, runtime_policy, created_at]
       properties:
         id:
           $ref: "#/components/schemas/PublicId"
@@ -462,6 +462,40 @@ components:
         workload_type:
           type: string
           enum: [static, web, private, worker, cron, job]
+        source:
+          $ref: "#/components/schemas/SourceSnapshot"
+        runtime_policy:
+          $ref: "#/components/schemas/RuntimePolicy"
+        created_at:
+          type: string
+          format: date-time
+
+    Environment:
+      type: object
+      required: [id, organization_id, project_id, name, slug, kind, lifecycle_state, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/PublicId"
+        organization_id:
+          $ref: "#/components/schemas/PublicId"
+        project_id:
+          $ref: "#/components/schemas/PublicId"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        slug:
+          type: string
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        kind:
+          type: string
+          enum: [production, staging, custom]
+        branch:
+          type: string
+          maxLength: 255
+          nullable: true
+        lifecycle_state:
+          $ref: "#/components/schemas/ResourceLifecycleState"
         created_at:
           type: string
           format: date-time
@@ -618,6 +652,7 @@ components:
 
     SourceSnapshot:
       type: object
+      additionalProperties: false
       required: [type, reference]
       properties:
         type:
@@ -630,6 +665,33 @@ components:
           type: string
         root_directory:
           type: string
+
+    RuntimePolicy:
+      type: object
+      additionalProperties: false
+      properties:
+        readiness_path:
+          type: string
+          pattern: "^/"
+          maxLength: 2048
+        liveness_path:
+          type: string
+          pattern: "^/"
+          maxLength: 2048
+        graceful_shutdown_seconds:
+          type: integer
+          minimum: 1
+          maximum: 300
+
+    ResourceLifecycleState:
+      type: string
+      enum:
+        - active
+        - deletion_requested
+        - draining
+        - deleting_resources
+        - tombstoned
+        - permanently_deleted
 
     CreateOrganizationRequest:
       type: object
@@ -656,7 +718,7 @@ components:
 
     CreateServiceRequest:
       type: object
-      required: [name, workload_type]
+      required: [name, workload_type, source]
       properties:
         name:
           type: string
@@ -665,6 +727,10 @@ components:
         workload_type:
           type: string
           enum: [static, web, private, worker, cron, job]
+        source:
+          $ref: "#/components/schemas/SourceSnapshot"
+        runtime_policy:
+          $ref: "#/components/schemas/RuntimePolicy"
 
     CreateDeploymentRequest:
       type: object

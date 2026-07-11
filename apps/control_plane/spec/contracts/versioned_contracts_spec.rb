@@ -60,6 +60,18 @@ RSpec.describe "Versioned contracts" do
         expect(references).to include("#/components/parameters/IdempotencyKey")
       end
     end
+
+    it "requires every service to have one bounded source and runtime policy" do
+      contract = YAML.safe_load_file(openapi_path, aliases: true)
+      schemas = contract.fetch("components").fetch("schemas")
+
+      expect(schemas.fetch("Service").fetch("required")).to include("source", "runtime_policy")
+      expect(schemas.fetch("CreateServiceRequest").fetch("required")).to include("source")
+      expect(schemas.fetch("SourceSnapshot").fetch("additionalProperties")).to be(false)
+      expect(schemas.fetch("RuntimePolicy").fetch("additionalProperties")).to be(false)
+      expect(schemas.fetch("Environment").fetch("properties").fetch("project_id"))
+        .to eq("$ref" => "#/components/schemas/PublicId")
+    end
   end
 
   describe "the canonical event envelope" do

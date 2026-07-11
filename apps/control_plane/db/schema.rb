@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_204000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_205000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -34,6 +34,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_204000) do
     t.check_constraint "kind::text = 'production'::text OR kind::text = 'staging'::text OR kind::text = 'custom'::text", name: "environments_kind_allowed"
     t.check_constraint "lifecycle_state::text = 'active'::text OR lifecycle_state::text = 'deletion_requested'::text OR lifecycle_state::text = 'draining'::text OR lifecycle_state::text = 'deleting_resources'::text OR lifecycle_state::text = 'tombstoned'::text OR lifecycle_state::text = 'permanently_deleted'::text", name: "environments_lifecycle_state_allowed"
     t.check_constraint "slug::text = lower(btrim(slug::text)) AND slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "environments_slug_normalized"
+  end
+
+  create_table "idempotency_records", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key", limit: 255, null: false
+    t.string "operation", limit: 120, null: false
+    t.uuid "organization_id", null: false
+    t.string "request_fingerprint", limit: 64, null: false
+    t.uuid "resource_id"
+    t.string "resource_type", limit: 120
+    t.jsonb "response_body", null: false
+    t.integer "response_status", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id", "key"], name: "index_idempotency_records_on_organization_id_and_key", unique: true
+    t.index ["organization_id"], name: "index_idempotency_records_on_organization_id"
+    t.index ["resource_type", "resource_id"], name: "index_idempotency_records_on_resource_type_and_resource_id"
+    t.check_constraint "jsonb_typeof(response_body) = 'object'::text", name: "idempotency_records_response_object"
+    t.check_constraint "key::text = btrim(key::text) AND key::text <> ''::text", name: "idempotency_records_key_normalized"
+    t.check_constraint "operation::text = btrim(operation::text) AND operation::text <> ''::text", name: "idempotency_records_operation_normalized"
+    t.check_constraint "request_fingerprint::text ~ '^[0-9a-f]{64}$'::text", name: "idempotency_records_fingerprint_format"
+    t.check_constraint "response_status >= 200 AND response_status <= 599", name: "idempotency_records_status_range"
   end
 
   create_table "memberships", id: :uuid, default: nil, force: :cascade do |t|
@@ -105,6 +126,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_204000) do
   end
 
   add_foreign_key "environments", "projects", on_delete: :restrict
+  add_foreign_key "idempotency_records", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "users", on_delete: :restrict
   add_foreign_key "projects", "organizations", on_delete: :restrict
