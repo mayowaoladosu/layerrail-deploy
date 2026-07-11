@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_211000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -55,6 +55,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_210000) do
     t.check_constraint "jsonb_typeof(permissions) = 'object'::text", name: "git_installations_permissions_object"
     t.check_constraint "provider::text = 'github'::text", name: "git_installations_provider_allowed"
     t.check_constraint "status::text = 'active'::text OR status::text = 'suspended'::text OR status::text = 'disconnected'::text", name: "git_installations_status_allowed"
+  end
+
+  create_table "git_webhook_inboxes", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "data", null: false
+    t.string "delivery_id", limit: 255, null: false
+    t.string "event_type", limit: 120, null: false
+    t.uuid "git_installation_id", null: false
+    t.datetime "occurred_at", null: false
+    t.uuid "organization_id", null: false
+    t.string "payload_digest", limit: 64, null: false
+    t.datetime "processed_at"
+    t.string "provider", limit: 32, null: false
+    t.string "provider_repository_id", limit: 255
+    t.text "safe_error"
+    t.string "status", limit: 32, null: false
+    t.datetime "updated_at", null: false
+    t.index ["git_installation_id", "provider_repository_id"], name: "idx_on_git_installation_id_provider_repository_id_43d077995b"
+    t.index ["organization_id", "status", "created_at"], name: "idx_on_organization_id_status_created_at_b0e5eedb6a"
+    t.index ["provider", "delivery_id"], name: "index_git_webhook_inboxes_on_provider_and_delivery_id", unique: true
+    t.check_constraint "jsonb_typeof(data) = 'object'::text", name: "git_webhook_inboxes_data_object"
+    t.check_constraint "payload_digest::text ~ '^[0-9a-f]{64}$'::text", name: "git_webhook_inboxes_digest_format"
+    t.check_constraint "provider::text = 'github'::text", name: "git_webhook_inboxes_provider_allowed"
+    t.check_constraint "status::text = 'pending'::text OR status::text = 'processed'::text OR status::text = 'failed'::text", name: "git_webhook_inboxes_status_allowed"
   end
 
   create_table "idempotency_records", id: :uuid, default: nil, force: :cascade do |t|
@@ -174,6 +198,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_210000) do
 
   add_foreign_key "environments", "projects", on_delete: :restrict
   add_foreign_key "git_installations", "organizations", on_delete: :restrict
+  add_foreign_key "git_webhook_inboxes", "git_installations", column: ["git_installation_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "idempotency_records", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "users", on_delete: :restrict

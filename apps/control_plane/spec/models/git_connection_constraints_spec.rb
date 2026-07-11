@@ -33,6 +33,8 @@ RSpec.describe "Git connection constraints" do
     expect(RepositoryConnection.column_names).not_to include("token", "access_token", "secret")
     expect(GitInstallation.columns_hash.fetch("id").default_function).to be_nil
     expect(RepositoryConnection.columns_hash.fetch("id").default_function).to be_nil
+    expect(GitWebhookInbox.column_names).not_to include("body", "payload", "raw_payload")
+    expect(GitWebhookInbox.columns_hash.fetch("id").default_function).to be_nil
   end
 
   it "rejects cross-organization installation ownership in PostgreSQL" do

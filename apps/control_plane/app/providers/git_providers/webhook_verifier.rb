@@ -59,6 +59,10 @@ module GitProviders
         normalize_pull_request(delivery_id:, payload:)
       when "installation"
         normalize_installation(delivery_id:, payload:)
+      when "installation_repositories"
+        normalize_installation_repositories(delivery_id:, payload:)
+      when "repository"
+        normalize_repository(delivery_id:, payload:)
       else
         failure(:unsupported_event)
       end
@@ -141,6 +145,54 @@ module GitProviders
         data: {
           "account_id" => account_id.to_s,
           "account_login" => account_login
+        }
+      )
+    end
+
+    def normalize_installation_repositories(delivery_id:, payload:)
+      action = payload["action"]
+      repositories = case action
+      when "added"
+        payload["repositories_added"]
+      when "removed"
+        payload["repositories_removed"]
+      end
+      return failure(:unsupported_event) unless repositories.is_a?(Array)
+
+      installation_id = payload.dig("installation", "id")
+      repository_ids = repositories.filter_map { |repository| repository["id"]&.to_s }
+      return failure(:invalid_payload) if installation_id.blank? || repository_ids.length != repositories.length
+
+      success(
+        delivery_id:,
+        type: "git.repositories.changed.v1",
+        installation_id:,
+        repository_id: nil,
+        data: {
+          "action" => action,
+          "repository_ids" => repository_ids
+        }
+      )
+    end
+
+    def normalize_repository(delivery_id:, payload:)
+      action = payload["action"]
+      return failure(:unsupported_event) unless action.in?(%w[deleted transferred renamed])
+
+      installation_id = payload.dig("installation", "id")
+      repository_id = payload.dig("repository", "id")
+      full_name = payload.dig("repository", "full_name")
+      return failure(:invalid_payload) if installation_id.blank? || repository_id.blank?
+      return failure(:invalid_payload) if action == "renamed" && full_name.blank?
+
+      success(
+        delivery_id:,
+        type: "git.repository.changed.v1",
+        installation_id:,
+        repository_id:,
+        data: {
+          "action" => action,
+          "full_name" => full_name
         }
       )
     end
