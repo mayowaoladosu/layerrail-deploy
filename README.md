@@ -75,6 +75,8 @@ Start the stack:
 
 The stack auto-detects development mode on macOS and enables hot reloading. Data is stored in `./data/`.
 
+The Phase 0 Ruby rebuild also starts the Rails control plane in development. It is available at `http://localhost:3001` and `http://control.localhost`; the current FastAPI application remains available at `http://localhost` as the behavior reference.
+
 ## Registry catalog
 
 Default runner/preset definitions ship in `registry/` and are copied to `DATA_DIR/registry/` during install/update.

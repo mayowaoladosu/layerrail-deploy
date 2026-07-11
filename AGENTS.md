@@ -171,6 +171,19 @@ These guidelines apply to every script under `scripts/` (install/start/stop/rest
 
 ---
 
+## Rails Control Plane (`apps/control_plane/`)
+
+1. Follow accepted decisions in `docs/adr/` and the approved work packet in `docs/product/work-packets/` before changing Rails behavior.
+2. Ruby 3.4.10, Rails 8.1.3 and RSpec Rails 8.0.4 are pinned. Update them only through an explicit architecture decision.
+3. Use standard Rails MVC, Active Record, Hotwire/Turbo/Stimulus and plain Ruby boundary objects. Do not introduce a separate SPA or hidden tenant-scoping metaprogramming.
+4. Use RSpec exclusively. New organization-owned resources require positive ownership and cross-organization fail-closed examples.
+5. Rails owns product behavior and desired state. It must not import the legacy Python implementation, execute customer code or access an unrestricted Docker socket.
+6. Keep Rails development and test databases separate from the legacy application schema. Never map Active Record models onto existing FastAPI tables without an approved migration work packet.
+7. Run `bin/ci` through the `control-plane` development container before completing a Rails slice. It prepares PostgreSQL, checks Zeitwerk, runs RSpec and executes security gates.
+8. Keep runtime processes non-root. Writable development state belongs on the dedicated log, storage and tmp volumes, not in the source mount.
+
+---
+
 ## Docker & Compose
 
 ### Compose Files

@@ -5,6 +5,9 @@ CI.run do
 
   step "Style: Ruby", "bin/rubocop"
 
+  step "Boot: Zeitwerk", "bin/rails zeitwerk:check"
+  step "Tests: RSpec", "bundle exec rspec"
+
   step "Security: Gem audit", "bin/bundler-audit"
   step "Security: Importmap vulnerability audit", "bin/importmap audit"
   step "Security: Brakeman code analysis", "bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error"

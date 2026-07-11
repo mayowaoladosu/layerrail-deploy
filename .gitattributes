@@ -2,6 +2,12 @@
 *.rb text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+*.erb text eol=lf
+*.js text eol=lf
+Dockerfile* text eol=lf
 Gemfile text eol=lf
 Gemfile.lock text eol=lf
 .ruby-version text eol=lf
+apps/control_plane/bin/* text eol=lf
+apps/control_plane/config.ru text eol=lf
+apps/control_plane/Rakefile text eol=lf

@@ -17,9 +17,13 @@ services:
     env_file:
       - ${DATA_DIR:-../data}/.env
     environment:
+      BUNDLE_FROZEN: "true"
+      BUNDLE_USER_HOME: /tmp/bundle-user
+      HOME: /tmp/home
       RAILS_ENV: development
       RAILS_LOG_TO_STDOUT: "true"
       XDG_CACHE_HOME: /tmp/cache
+      XDG_DATA_HOME: /tmp/data
       POSTGRES_HOST: pgsql
       POSTGRES_PORT: 5432
       CONTROL_PLANE_DATABASE: ${CONTROL_PLANE_DATABASE:-lrail_control_plane_development}
@@ -39,7 +43,7 @@ services:
       - "traefik.http.services.control-plane.loadbalancer.server.port=3000"
       - "traefik.docker.network=devpush_default"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/up"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 10s
       timeout: 5s
       retries: 5

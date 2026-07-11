@@ -12,6 +12,26 @@ permissions:
 jobs:
   ruby-toolchain:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lrail
+          POSTGRES_PASSWORD: lrail_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username=lrail"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RAILS_ENV: test
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: lrail
+      POSTGRES_PASSWORD: lrail_test_password
+      CONTROL_PLANE_TEST_DATABASE: lrail_control_plane_test
     defaults:
       run:
         working-directory: apps/control_plane
@@ -39,3 +59,6 @@ jobs:
           test "$ruby_version" = "3.4.10"
           test "$rails_version" = "Rails 8.1.3"
           test "$rspec_version" = "8.0.4"
+
+      - name: Run control-plane CI
+        run: bin/ci

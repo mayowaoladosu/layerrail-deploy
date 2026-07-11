@@ -8,6 +8,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         curl \
+        git \
         libpq-dev \
         libvips \
         libyaml-dev \
@@ -26,7 +27,7 @@ RUN bundle install
 
 # Prepare writable runtime directories
 RUN mkdir -p log storage tmp/pids tmp/storage \
-    && chown -R "${APP_UID}:${APP_GID}" /rails /usr/local/bundle
+    && chown -R "${APP_UID}:${APP_GID}" /rails
 
 ENV HOME=/rails
 

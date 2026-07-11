@@ -24,6 +24,12 @@ This document describes the high‑level architecture of /dev/push, how the main
 - **Runners**: User apps run inside runner containers pulled from the registry catalog (e.g. `ghcr.io/devpushhq/runner-python-3.12:1.0.0`). The deploy job (`app/workers/tasks/deployment.py`) creates the container and runs the configured build/start commands.
 - **Reverse proxy**: We have Traefik sitting in front of both app and the deployed runner containers. All routing is done using Traefik labels, and we also maintain environment and branch aliases (e.g. `my-project-env-staging.devpush.app`) using Traefik config files.
 
+### Ruby control-plane rebuild
+
+Phase 0 introduces a Rails control plane in `apps/control_plane/` beside the current FastAPI application. Rails uses separate `lrail_control_plane_development` and `lrail_control_plane_test` databases on the local PostgreSQL server and never migrates the legacy schema. The current application remains the behavioral reference and production implementation until explicit parity and cutover gates pass.
+
+In development, `scripts/start.sh` includes `compose/control-plane.dev.yml`. Rails is available on `localhost:3001` and through Traefik at `control.localhost`. Its `/up` endpoint reports process liveness; `/health` verifies PostgreSQL readiness. The service runs as a non-root user and has writable Docker volumes only for logs, temporary data and local storage.
+
 ## File structure
 
 - `app/`: The main FastAPI application (see README file).
