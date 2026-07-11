@@ -1,0 +1,17 @@
+{
+  "event_id": "019b9a80-0000-7000-8000-000000000001",
+  "event_type": "deployment.build.completed.v1",
+  "occurred_at": "2026-07-11T19:00:00Z",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "resource_id": "019b9a80-0000-7000-8000-000000000003",
+  "correlation_id": "019b9a80-0000-7000-8000-000000000004",
+  "idempotency_key": "build:019b9a80-0000-7000-8000-000000000005:attempt:1",
+  "producer": "build-controller",
+  "schema_version": 1,
+  "data": {
+    "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+    "build_id": "019b9a80-0000-7000-8000-000000000005",
+    "artifact_digest": "sha256:8e785f6f5f35dbf8f6e6f08d517f56bf1822b4e225dc5f402f294bbf4e2f1c41",
+    "status": "completed"
+  }
+}

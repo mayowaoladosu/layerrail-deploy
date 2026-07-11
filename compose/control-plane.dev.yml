@@ -20,6 +20,7 @@ services:
       BUNDLE_FROZEN: "true"
       BUNDLE_USER_HOME: /tmp/bundle-user
       HOME: /tmp/home
+      LRAIL_CONTRACTS_DIR: /contracts
       RAILS_ENV: development
       RAILS_LOG_TO_STDOUT: "true"
       XDG_CACHE_HOME: /tmp/cache
@@ -32,6 +33,7 @@ services:
       - "127.0.0.1:3001:3000"
     volumes:
       - ${APP_DIR:-..}/apps/control_plane:/rails
+      - ${APP_DIR:-..}/contracts:/contracts:ro
       - control-plane-log:/rails/log
       - control-plane-storage:/rails/storage
       - control-plane-tmp:/rails/tmp
