@@ -11,3 +11,4 @@ Each record includes its status, date, relevant requirements, context, decision 
 - [ADR-003: UUIDv7 resource identifiers](0003-uuidv7-resource-identifiers.md)
 - [ADR-004: Project-scoped environments](0004-project-scoped-environments.md)
 - [ADR-005: Installation-scoped Git provider seam](0005-installation-scoped-git-provider-seam.md)
+- [ADR-006: Ephemeral GitHub installation tokens](0006-ephemeral-github-installation-tokens.md)

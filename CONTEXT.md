@@ -25,6 +25,7 @@
 - **Provider user**: An external source-control identity that can be mapped to a Lrail user or recorded as a source actor.
 - **Clone credential**: A short-lived secret that authorizes one build plane operation to fetch an approved repository revision.
 - **Webhook delivery**: One signed provider notification with a provider delivery identifier.
+- **Webhook inbox message**: One deduplicated, organization-owned normalized Git event retained for durable processing.
 - **Normalized Git event**: A verified provider notification expressed in Lrail's provider-neutral vocabulary.
 
 ## Deployments and routing
