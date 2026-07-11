@@ -32,6 +32,7 @@ jobs:
       POSTGRES_USER: lrail
       POSTGRES_PASSWORD: lrail_test_password
       CONTROL_PLANE_TEST_DATABASE: lrail_control_plane_test
+      RAILS_DUMP_SCHEMA: "true"
     defaults:
       run:
         working-directory: apps/control_plane
@@ -59,6 +60,12 @@ jobs:
           test "$ruby_version" = "3.4.10"
           test "$rails_version" = "Rails 8.1.3"
           test "$rspec_version" = "8.0.4"
+
+      - name: Verify migrations and schema
+        run: |
+          bin/rails db:drop db:create db:migrate
+          bin/rails db:schema:dump
+          git diff --exit-code -- db/schema.rb
 
       - name: Run control-plane CI
         run: bin/ci
