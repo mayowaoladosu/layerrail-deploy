@@ -75,6 +75,10 @@ module GitProviders
       )
     end
 
+    def inspect
+      "#<#{self.class.name} installation_id=#{@installation_id.inspect} credentials=[REDACTED]>"
+    end
+
     private
 
     def active?

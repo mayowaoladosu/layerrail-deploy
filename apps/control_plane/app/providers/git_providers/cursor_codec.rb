@@ -34,6 +34,10 @@ module GitProviders
       nil
     end
 
+    def inspect
+      "#<#{self.class.name} secret=[REDACTED]>"
+    end
+
     private
 
     def secure_compare(value, expected)

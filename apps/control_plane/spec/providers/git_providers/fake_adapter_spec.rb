@@ -3,6 +3,10 @@ require "rails_helper"
 RSpec.describe GitProviders::FakeAdapter do
   subject(:provider) { build_provider }
 
+  let(:clock_time) { Time.zone.parse("2026-07-11 20:00:00 UTC") }
+  let(:installation_id) { "installation-1" }
+  let(:repository_id) { "repository-1" }
+
   let(:unauthorized_repository) do
     GitProviders::Types::Repository.new(
       id: "repository-foreign",
@@ -92,6 +96,16 @@ RSpec.describe GitProviders::FakeAdapter do
   def webhook_signature(body)
     digest = OpenSSL::HMAC.hexdigest("SHA256", "webhook-secret", body)
     "sha256=#{digest}"
+  end
+
+  it "redacts signing and access secrets from adapter internals" do
+    session = provider.open_session(installation_id:).value
+    cursor_codec = session.instance_variable_get(:@cursor_codec)
+    inspected = [ provider.inspect, session.inspect, cursor_codec.inspect ].join(" ")
+
+    expect(inspected).not_to include("credential-seed")
+    expect(inspected).not_to include("webhook-secret")
+    expect(inspected).not_to include("user-access-secret")
   end
 
   it_behaves_like "a Git provider adapter"
