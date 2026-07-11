@@ -53,6 +53,22 @@ RSpec.shared_examples "a Git provider adapter" do
     expect(first.value.items).not_to include(unauthorized_repository)
   end
 
+  it "fetches one repository only when the installation authorizes it" do
+    session = provider.open_session(installation_id:).value
+
+    authorized = session.repository(repository_id:)
+    unauthorized = session.repository(repository_id: unauthorized_repository.id)
+
+    expect(authorized).to be_success
+    expect(authorized.value).to have_attributes(
+      id: repository_id,
+      full_name: "layerrail/api",
+      default_branch: "main"
+    )
+    expect(unauthorized).to be_failure
+    expect(unauthorized.error.code).to eq(:repository_not_found)
+  end
+
   it "rejects malformed or cross-operation pagination cursors" do
     session = provider.open_session(installation_id:).value
     repository_cursor = session.repositories(limit: 1).value.next_cursor

@@ -24,6 +24,13 @@ module GitProviders
       )
     end
 
+    def repository(repository_id:)
+      return inactive_failure unless active?
+
+      value = authorized_repository(repository_id)
+      value ? Result.success(value) : repository_failure
+    end
+
     def branches(repository_id:, cursor: nil, limit: 30)
       return inactive_failure unless active?
       return repository_failure unless authorized_repository(repository_id)

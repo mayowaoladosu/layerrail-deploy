@@ -43,6 +43,17 @@ module GitProviders
       provider_unavailable
     end
 
+    def repository(repository_id:)
+      return installation_inactive unless @installation_active.call
+
+      result = authorized_repository(repository_id)
+      return result if result.failure?
+
+      Result.success(map_repository(result.value))
+    rescue KeyError, TypeError, URI::InvalidURIError
+      provider_unavailable
+    end
+
     def branches(repository_id:, cursor: nil, limit: 30)
       return installation_inactive unless @installation_active.call
 

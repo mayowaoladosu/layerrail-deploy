@@ -4,6 +4,10 @@ module GitProviders
       raise NotImplementedError
     end
 
+    def repository(repository_id:)
+      raise NotImplementedError
+    end
+
     def branches(repository_id:, cursor: nil, limit: 30)
       raise NotImplementedError
     end
