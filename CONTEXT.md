@@ -17,6 +17,16 @@
 - **Environment**: A named release context within a project, such as production or staging. An environment can apply across multiple services in the same project.
 - **Branch mapping**: The optional association between one Git branch and one environment in a project.
 
+## Git providers
+
+- **Git provider**: An external source-control system connected to Lrail through an installation and a provider-neutral interface.
+- **Installation**: A provider authorization grant for one external account and its selected repositories.
+- **Repository**: A provider-owned source repository visible through an installation.
+- **Provider user**: An external source-control identity that can be mapped to a Lrail user or recorded as a source actor.
+- **Clone credential**: A short-lived secret that authorizes one build plane operation to fetch an approved repository revision.
+- **Webhook delivery**: One signed provider notification with a provider delivery identifier.
+- **Normalized Git event**: A verified provider notification expressed in Lrail's provider-neutral vocabulary.
+
 ## Deployments and routing
 
 - **Deployment**: One attempt to turn a source snapshot into a runnable candidate.

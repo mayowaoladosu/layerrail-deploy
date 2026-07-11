@@ -181,6 +181,8 @@ These guidelines apply to every script under `scripts/` (install/start/stop/rest
 6. Keep Rails development and test databases separate from the legacy application schema. Never map Active Record models onto existing FastAPI tables without an approved migration work packet.
 7. Run `bin/ci` through the `control-plane` development container before completing a Rails slice. It prepares PostgreSQL, checks Zeitwerk, runs RSpec and executes security gates.
 8. Keep runtime processes non-root. Writable development state belongs on the dedicated log, storage and tmp volumes, not in the source mount.
+9. Git provider adapters return provider-neutral `GitProviders::Result` values and pass the shared provider contract. Do not expose raw provider hashes or exceptions.
+10. Bind repository operations to an installation session. Never serialize, inspect or log clone secrets, user tokens, webhook secrets or raw credential-bearing URLs.
 
 ---
 
