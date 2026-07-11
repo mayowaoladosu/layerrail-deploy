@@ -253,6 +253,40 @@ RSpec.shared_examples "a Git provider adapter" do
     expect(result.value.type).to eq("git.installation.disconnected.v1")
   end
 
+  it "normalizes pull request events without retaining the raw payload" do
+    body = JSON.generate(
+      action: "synchronize",
+      installation: { id: installation_id },
+      repository: { id: repository_id },
+      number: 42,
+      pull_request: {
+        head: { ref: "feature", sha: "cccccccc" },
+        base: { ref: "main" },
+        merged: false
+      },
+      sender: { id: "provider-user-1" }
+    )
+
+    result = provider.verify_webhook(
+      delivery_id: "delivery-pull-request",
+      event_type: "pull_request",
+      signature: webhook_signature(body),
+      body:
+    )
+
+    expect(result).to be_success
+    expect(result.value.type).to eq("git.pull_request.v1")
+    expect(result.value.data).to include(
+      "action" => "synchronize",
+      "number" => 42,
+      "head_ref" => "feature",
+      "head_sha" => "cccccccc",
+      "base_ref" => "main",
+      "merged" => false
+    )
+    expect(result.value.to_h.to_s).not_to include(body)
+  end
+
   it "disconnects installations idempotently and invalidates existing sessions" do
     session = provider.open_session(installation_id:).value
 

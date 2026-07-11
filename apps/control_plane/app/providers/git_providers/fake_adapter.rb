@@ -1,9 +1,5 @@
-require "openssl"
-
 module GitProviders
   class FakeAdapter < Adapter
-    MAX_WEBHOOK_BYTES = 2.megabytes
-
     def initialize(
       clock:,
       webhook_secret:,
@@ -25,6 +21,7 @@ module GitProviders
       end
       @users_by_token = users_by_token.dup
       @cursor_codec = CursorCodec.new(secret: credential_seed)
+      @webhook_verifier = WebhookVerifier.new(secret: webhook_secret, clock:)
     end
 
     def installation_setup(state:, redirect_uri:)
@@ -88,20 +85,7 @@ module GitProviders
     end
 
     def verify_webhook(delivery_id:, event_type:, signature:, body:)
-      return failure(:invalid_signature) unless valid_signature?(signature, body)
-      return failure(:payload_too_large) if body.bytesize > MAX_WEBHOOK_BYTES
-      return failure(:invalid_payload) unless delivery_id.present?
-
-      payload = JSON.parse(body)
-      return failure(:invalid_payload) unless payload.is_a?(Hash)
-
-      normalize_webhook(
-        delivery_id:,
-        event_type:,
-        payload:
-      )
-    rescue JSON::ParserError, TypeError
-      failure(:invalid_payload)
+      @webhook_verifier.call(delivery_id:, event_type:, signature:, body:)
     end
 
     def active_installation?(installation_id)
@@ -144,81 +128,6 @@ module GitProviders
 
     def failure(code)
       Result.failure(code, message: ERROR_MESSAGES.fetch(code))
-    end
-
-    def valid_signature?(signature, body)
-      expected = "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", @webhook_secret, body)}"
-
-      signature.to_s.bytesize == expected.bytesize &&
-        ActiveSupport::SecurityUtils.secure_compare(signature.to_s, expected)
-    end
-
-    def normalize_webhook(delivery_id:, event_type:, payload:)
-      case event_type
-      when "push"
-        normalize_push(delivery_id:, payload:)
-      when "installation"
-        normalize_installation(delivery_id:, payload:)
-      else
-        failure(:unsupported_event)
-      end
-    end
-
-    def normalize_push(delivery_id:, payload:)
-      installation_id = payload.dig("installation", "id")
-      repository_id = payload.dig("repository", "id")
-      ref = payload["ref"]
-      before_sha = payload["before"]
-      after_sha = payload["after"]
-      provider_user_id = payload.dig("pusher", "id")
-      required = [ installation_id, repository_id, ref, before_sha, after_sha, provider_user_id ]
-      return failure(:invalid_payload) if required.any?(&:blank?)
-
-      Result.success(
-        Types::WebhookEvent.new(
-          delivery_id:,
-          type: "git.push.v1",
-          installation_id:,
-          repository_id:,
-          occurred_at: @clock.call,
-          data: {
-            "ref" => ref.delete_prefix("refs/heads/"),
-            "before_sha" => before_sha,
-            "after_sha" => after_sha,
-            "provider_user_id" => provider_user_id
-          }
-        )
-      )
-    end
-
-    def normalize_installation(delivery_id:, payload:)
-      action = payload["action"]
-      type = {
-        "created" => "git.installation.connected.v1",
-        "deleted" => "git.installation.disconnected.v1",
-        "suspended" => "git.installation.suspended.v1",
-        "unsuspended" => "git.installation.connected.v1"
-      }[action]
-      return failure(:unsupported_event) unless type
-
-      installation_id = payload.dig("installation", "id")
-      account_id = payload.dig("installation", "account", "id")
-      account_login = payload.dig("installation", "account", "login")
-      return failure(:invalid_payload) if [ installation_id, account_id, account_login ].any?(&:blank?)
-
-      Result.success(
-        Types::WebhookEvent.new(
-          delivery_id:,
-          type:,
-          installation_id:,
-          repository_id: nil,
-          occurred_at: @clock.call,
-          data: {
-            "account_id" => account_id,
-            "account_login" => account_login
-          }
-        )
-      )
     end
   end
 end
