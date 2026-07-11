@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_201000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_202100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -24,7 +24,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_201000) do
     t.index ["organization_id", "user_id"], name: "index_memberships_on_organization_id_and_user_id", unique: true
     t.index ["organization_id"], name: "index_memberships_on_organization_id"
     t.index ["user_id"], name: "index_memberships_on_user_id"
-    t.check_constraint "role::text = ANY (ARRAY['owner'::character varying, 'admin'::character varying, 'member'::character varying]::text[])", name: "memberships_role_allowed"
+    t.check_constraint "role::text = 'owner'::text OR role::text = 'admin'::text OR role::text = 'member'::text", name: "memberships_role_allowed"
   end
 
   create_table "organizations", id: :uuid, default: nil, force: :cascade do |t|

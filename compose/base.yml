@@ -144,7 +144,7 @@ services:
       - "traefik.http.middlewares.deployment-redirect.redirectRegex.permanent=false"
 
   pgsql:
-    image: postgres:16
+    image: postgres:16.14
     restart: always
     ports:
       - "127.0.0.1:5432:5432"
