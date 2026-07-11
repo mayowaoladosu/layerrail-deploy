@@ -10,9 +10,31 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_202100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_203000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "environments", id: :uuid, default: nil, force: :cascade do |t|
+    t.string "branch", limit: 255
+    t.datetime "created_at", null: false
+    t.string "kind", limit: 16, null: false
+    t.string "lifecycle_state", limit: 32, default: "active", null: false
+    t.string "name", limit: 120, null: false
+    t.uuid "project_id", null: false
+    t.string "slug", limit: 64, null: false
+    t.datetime "updated_at", null: false
+    t.index ["project_id", "branch"], name: "index_environments_on_project_id_and_branch", unique: true, where: "(branch IS NOT NULL)"
+    t.index ["project_id", "lifecycle_state"], name: "index_environments_on_project_id_and_lifecycle_state"
+    t.index ["project_id", "slug"], name: "index_environments_on_project_id_and_slug", unique: true
+    t.index ["project_id"], name: "index_environments_on_one_production_per_project", unique: true, where: "((kind)::text = 'production'::text)"
+    t.index ["project_id"], name: "index_environments_on_one_staging_per_project", unique: true, where: "((kind)::text = 'staging'::text)"
+    t.index ["project_id"], name: "index_environments_on_project_id"
+    t.check_constraint "branch IS NULL OR branch::text = btrim(branch::text) AND branch::text <> ''::text", name: "environments_branch_normalized"
+    t.check_constraint "btrim(name::text) <> ''::text", name: "environments_name_present"
+    t.check_constraint "kind::text = 'production'::text OR kind::text = 'staging'::text OR kind::text = 'custom'::text", name: "environments_kind_allowed"
+    t.check_constraint "lifecycle_state::text = 'active'::text OR lifecycle_state::text = 'deletion_requested'::text OR lifecycle_state::text = 'draining'::text OR lifecycle_state::text = 'deleting_resources'::text OR lifecycle_state::text = 'tombstoned'::text OR lifecycle_state::text = 'permanently_deleted'::text", name: "environments_lifecycle_state_allowed"
+    t.check_constraint "slug::text = lower(btrim(slug::text)) AND slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "environments_slug_normalized"
+  end
 
   create_table "memberships", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -34,6 +56,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_202100) do
     t.check_constraint "btrim(name::text) <> ''::text", name: "organizations_name_present"
   end
 
+  create_table "projects", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "lifecycle_state", limit: 32, default: "active", null: false
+    t.string "name", limit: 120, null: false
+    t.uuid "organization_id", null: false
+    t.string "slug", limit: 64, null: false
+    t.datetime "updated_at", null: false
+    t.index "organization_id, lower((name)::text)", name: "index_projects_on_organization_and_lower_name", unique: true
+    t.index ["organization_id", "lifecycle_state"], name: "index_projects_on_organization_id_and_lifecycle_state"
+    t.index ["organization_id", "slug"], name: "index_projects_on_organization_id_and_slug", unique: true
+    t.index ["organization_id"], name: "index_projects_on_organization_id"
+    t.check_constraint "btrim(name::text) <> ''::text", name: "projects_name_present"
+    t.check_constraint "lifecycle_state::text = 'active'::text OR lifecycle_state::text = 'deletion_requested'::text OR lifecycle_state::text = 'draining'::text OR lifecycle_state::text = 'deleting_resources'::text OR lifecycle_state::text = 'tombstoned'::text OR lifecycle_state::text = 'permanently_deleted'::text", name: "projects_lifecycle_state_allowed"
+    t.check_constraint "slug::text = lower(btrim(slug::text)) AND slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "projects_slug_normalized"
+  end
+
   create_table "users", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", limit: 320, null: false
@@ -44,6 +82,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_202100) do
     t.check_constraint "email::text = lower(btrim(email::text))", name: "users_email_normalized"
   end
 
+  add_foreign_key "environments", "projects", on_delete: :restrict
   add_foreign_key "memberships", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "users", on_delete: :restrict
+  add_foreign_key "projects", "organizations", on_delete: :restrict
 end
