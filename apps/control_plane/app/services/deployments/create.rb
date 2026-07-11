@@ -58,6 +58,7 @@ module Deployments
         candidate.configuration_snapshot = configuration_snapshot
         candidate.save!
         transition = candidate.deployment_transitions.create!(
+          correlation_id: candidate.correlation_id,
           sequence: 1,
           from_status: nil,
           to_status: "created",

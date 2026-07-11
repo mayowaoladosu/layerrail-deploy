@@ -43,6 +43,7 @@ RSpec.describe "Deployment constraints" do
     _context, deployment = create_deployment
     transition = deployment.deployment_transitions.sole
 
+    expect(transition.correlation_id).to eq(deployment.correlation_id)
     expect { transition.update!(cause: "changed") }.to raise_error(ActiveRecord::ReadonlyAttributeError)
     expect { transition.destroy! }.to raise_error(ActiveRecord::RecordNotDestroyed)
   end
@@ -54,5 +55,14 @@ RSpec.describe "Deployment constraints" do
     expect(records.map(&:id)).to all(match(/\A[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/))
     expect([ Deployment, ConfigurationSnapshot, DeploymentTransition ].map { |model| model.columns_hash.fetch("id").default_function })
       .to all(be_nil)
+  end
+
+  it "treats only canceled and failed deployments as terminal" do
+    _context, deployment = create_deployment
+
+    expect(%w[canceled failed]).to all(satisfy { |status| deployment.tap { |record| record.status = status }.terminal? })
+    expect(%w[created ready promoted superseded]).to all(
+      satisfy { |status| !deployment.tap { |record| record.status = status }.terminal? }
+    )
   end
 end

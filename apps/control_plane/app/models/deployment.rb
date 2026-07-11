@@ -12,6 +12,8 @@ class Deployment < ApplicationRecord
   belongs_to :environment
   belongs_to :configuration_snapshot
   has_many :deployment_transitions, dependent: :restrict_with_exception
+  has_many :builds, dependent: :restrict_with_exception
+  has_many :revisions, dependent: :restrict_with_exception
 
   enum :status, STATUSES, prefix: true, validate: true
   enum :conclusion, CONCLUSIONS, prefix: true, validate: { allow_nil: true }
@@ -37,7 +39,7 @@ class Deployment < ApplicationRecord
   validate :ownership_matches
 
   def terminal?
-    status.in?(%w[superseded canceled failed])
+    status.in?(%w[canceled failed])
   end
 
   private

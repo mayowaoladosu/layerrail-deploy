@@ -10,9 +10,59 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_214000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "aliases", id: :uuid, default: nil, force: :cascade do |t|
+    t.string "alias_type", limit: 32, null: false
+    t.datetime "created_at", null: false
+    t.uuid "current_revision_id", null: false
+    t.string "current_revision_status", limit: 32, null: false
+    t.uuid "environment_id", null: false
+    t.integer "lock_version", default: 0, null: false
+    t.string "name", limit: 255, null: false
+    t.uuid "organization_id", null: false
+    t.uuid "previous_revision_id"
+    t.string "previous_revision_status", limit: 32
+    t.uuid "project_id", null: false
+    t.uuid "service_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id", "project_id", "environment_id"], name: "idx_on_organization_id_project_id_environment_id_0ad74266ad"
+    t.index ["service_id", "alias_type", "name"], name: "index_aliases_on_service_id_and_alias_type_and_name", unique: true
+    t.check_constraint "alias_type::text = 'environment'::text OR alias_type::text = 'branch'::text", name: "aliases_type_allowed"
+    t.check_constraint "current_revision_status::text = 'ready'::text", name: "aliases_current_revision_ready"
+    t.check_constraint "name::text = btrim(name::text) AND name::text <> ''::text", name: "aliases_name_normalized"
+    t.check_constraint "previous_revision_id IS NULL AND previous_revision_status IS NULL OR previous_revision_id IS NOT NULL AND previous_revision_status::text = 'ready'::text", name: "aliases_previous_revision_ready"
+    t.check_constraint "previous_revision_id IS NULL OR previous_revision_id <> current_revision_id", name: "aliases_revisions_distinct"
+  end
+
+  create_table "builds", id: :uuid, default: nil, force: :cascade do |t|
+    t.string "artifact_digest", limit: 71
+    t.integer "attempt", null: false
+    t.datetime "created_at", null: false
+    t.uuid "deployment_id", null: false
+    t.jsonb "evidence", default: {}, null: false
+    t.datetime "finished_at"
+    t.string "idempotency_key", limit: 255, null: false
+    t.integer "lock_version", default: 0, null: false
+    t.uuid "organization_id", null: false
+    t.datetime "started_at", null: false
+    t.string "status", limit: 32, null: false
+    t.datetime "updated_at", null: false
+    t.index ["deployment_id", "attempt"], name: "index_builds_on_deployment_id_and_attempt", unique: true
+    t.index ["deployment_id", "idempotency_key"], name: "index_builds_on_deployment_id_and_idempotency_key", unique: true
+    t.index ["deployment_id"], name: "index_builds_on_deployment_id"
+    t.index ["id", "deployment_id", "organization_id", "artifact_digest"], name: "index_builds_on_revision_identity", unique: true
+    t.index ["organization_id", "status", "created_at"], name: "index_builds_on_organization_id_and_status_and_created_at"
+    t.index ["organization_id"], name: "index_builds_on_organization_id"
+    t.check_constraint "artifact_digest IS NULL OR artifact_digest::text ~ '^sha256:[0-9a-f]{64}$'::text", name: "builds_artifact_digest_format"
+    t.check_constraint "attempt > 0", name: "builds_attempt_positive"
+    t.check_constraint "idempotency_key::text = btrim(idempotency_key::text) AND idempotency_key::text <> ''::text", name: "builds_idempotency_key_normalized"
+    t.check_constraint "jsonb_typeof(evidence) = 'object'::text", name: "builds_evidence_object"
+    t.check_constraint "status::text = 'running'::text AND artifact_digest IS NULL AND finished_at IS NULL OR status::text = 'succeeded'::text AND artifact_digest IS NOT NULL AND finished_at IS NOT NULL OR (status::text = ANY (ARRAY['failed'::character varying, 'canceled'::character varying]::text[])) AND artifact_digest IS NULL AND finished_at IS NOT NULL", name: "builds_lifecycle_consistent"
+    t.check_constraint "status::text = 'running'::text OR status::text = 'succeeded'::text OR status::text = 'failed'::text OR status::text = 'canceled'::text", name: "builds_status_allowed"
+  end
 
   create_table "configuration_snapshots", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -62,6 +112,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
     t.uuid "actor_id"
     t.string "actor_type", limit: 16, null: false
     t.string "cause", limit: 120, null: false
+    t.uuid "correlation_id", null: false
     t.datetime "created_at", null: false
     t.uuid "deployment_id", null: false
     t.jsonb "error", default: {}, null: false
@@ -70,6 +121,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
     t.integer "sequence", null: false
     t.string "to_status", limit: 32, null: false
     t.datetime "updated_at", null: false
+    t.index ["correlation_id"], name: "index_deployment_transitions_on_correlation_id"
     t.index ["deployment_id", "sequence"], name: "index_deployment_transitions_on_deployment_id_and_sequence", unique: true
     t.index ["deployment_id"], name: "index_deployment_transitions_on_deployment_id"
     t.check_constraint "actor_type::text = 'user'::text OR actor_type::text = 'system'::text", name: "deployment_transitions_actor_type_allowed"
@@ -96,6 +148,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
     t.string "trigger", limit: 32, null: false
     t.datetime "updated_at", null: false
     t.index ["correlation_id"], name: "index_deployments_on_correlation_id", unique: true
+    t.index ["id", "correlation_id"], name: "index_deployments_on_transition_identity", unique: true
+    t.index ["id", "organization_id", "project_id", "service_id", "environment_id", "configuration_snapshot_id"], name: "index_deployments_on_tenant_resource_identity", unique: true
+    t.index ["id", "organization_id"], name: "index_deployments_on_tenant_identity", unique: true
     t.index ["organization_id", "idempotency_key"], name: "index_deployments_on_organization_id_and_idempotency_key", unique: true
     t.index ["organization_id", "status", "created_at"], name: "index_deployments_on_organization_id_and_status_and_created_at"
     t.index ["service_id", "environment_id", "created_at"], name: "idx_on_service_id_environment_id_created_at_858be4d753"
@@ -258,6 +313,39 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
     t.check_constraint "status::text = 'active'::text OR status::text = 'removed'::text OR status::text = 'disconnected'::text", name: "repository_connections_status_allowed"
   end
 
+  create_table "revisions", id: :uuid, default: nil, force: :cascade do |t|
+    t.string "artifact_digest", limit: 71, null: false
+    t.uuid "build_id", null: false
+    t.string "cell", limit: 64, null: false
+    t.uuid "configuration_snapshot_id", null: false
+    t.datetime "created_at", null: false
+    t.uuid "deployment_id", null: false
+    t.uuid "environment_id", null: false
+    t.integer "lock_version", default: 0, null: false
+    t.uuid "organization_id", null: false
+    t.uuid "project_id", null: false
+    t.jsonb "readiness", default: {}, null: false
+    t.datetime "ready_at"
+    t.string "region", limit: 64, null: false
+    t.jsonb "runtime_policy_snapshot", null: false
+    t.uuid "service_id", null: false
+    t.string "status", limit: 32, null: false
+    t.datetime "updated_at", null: false
+    t.index ["build_id"], name: "index_revisions_on_build_id", unique: true
+    t.index ["configuration_snapshot_id"], name: "index_revisions_on_configuration_snapshot_id"
+    t.index ["deployment_id"], name: "index_revisions_on_deployment_id"
+    t.index ["id", "organization_id", "project_id", "service_id", "environment_id", "status"], name: "index_revisions_on_ready_alias_identity", unique: true
+    t.index ["id", "organization_id", "project_id", "service_id", "environment_id"], name: "index_revisions_on_tenant_resource_identity", unique: true
+    t.index ["service_id", "environment_id", "status", "created_at"], name: "idx_on_service_id_environment_id_status_created_at_a0972e982e"
+    t.check_constraint "artifact_digest::text ~ '^sha256:[0-9a-f]{64}$'::text", name: "revisions_artifact_digest_format"
+    t.check_constraint "cell::text = btrim(cell::text) AND cell::text <> ''::text", name: "revisions_cell_normalized"
+    t.check_constraint "jsonb_typeof(readiness) = 'object'::text", name: "revisions_readiness_object"
+    t.check_constraint "jsonb_typeof(runtime_policy_snapshot) = 'object'::text", name: "revisions_runtime_policy_object"
+    t.check_constraint "region::text = btrim(region::text) AND region::text <> ''::text", name: "revisions_region_normalized"
+    t.check_constraint "status::text = 'candidate'::text AND ready_at IS NULL OR (status::text = ANY (ARRAY['ready'::character varying, 'retired'::character varying]::text[])) AND ready_at IS NOT NULL", name: "revisions_lifecycle_consistent"
+    t.check_constraint "status::text = 'candidate'::text OR status::text = 'ready'::text OR status::text = 'retired'::text", name: "revisions_status_allowed"
+  end
+
   create_table "services", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "lifecycle_state", limit: 32, default: "active", null: false
@@ -291,6 +379,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
     t.check_constraint "email::text = lower(btrim(email::text))", name: "users_email_normalized"
   end
 
+  add_foreign_key "aliases", "environments", column: ["environment_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "aliases", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
+  add_foreign_key "aliases", "revisions", column: ["current_revision_id", "organization_id", "project_id", "service_id", "environment_id", "current_revision_status"], primary_key: ["id", "organization_id", "project_id", "service_id", "environment_id", "status"], on_delete: :restrict
+  add_foreign_key "aliases", "revisions", column: ["previous_revision_id", "organization_id", "project_id", "service_id", "environment_id", "previous_revision_status"], primary_key: ["id", "organization_id", "project_id", "service_id", "environment_id", "status"], on_delete: :restrict
+  add_foreign_key "aliases", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "builds", "deployments", column: ["deployment_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
+  add_foreign_key "builds", "organizations", on_delete: :restrict
   add_foreign_key "configuration_snapshots", "configuration_versions", column: ["project_configuration_version_id", "project_id", "environment_id"], primary_key: ["id", "project_id", "environment_id"], on_delete: :restrict
   add_foreign_key "configuration_snapshots", "configuration_versions", column: ["service_configuration_version_id", "project_id", "environment_id"], primary_key: ["id", "project_id", "environment_id"], on_delete: :restrict
   add_foreign_key "configuration_snapshots", "environments", column: ["environment_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
@@ -301,6 +396,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
   add_foreign_key "configuration_versions", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "configuration_versions", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
   add_foreign_key "configuration_versions", "users", column: "created_by_id", on_delete: :restrict
+  add_foreign_key "deployment_transitions", "deployments", column: ["deployment_id", "correlation_id"], primary_key: ["id", "correlation_id"], on_delete: :restrict
   add_foreign_key "deployment_transitions", "deployments", on_delete: :restrict
   add_foreign_key "deployments", "configuration_snapshots", column: ["configuration_snapshot_id", "organization_id", "project_id", "environment_id", "service_id"], primary_key: ["id", "organization_id", "project_id", "environment_id", "service_id"], on_delete: :restrict
   add_foreign_key "deployments", "environments", column: ["environment_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
@@ -317,5 +413,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_213000) do
   add_foreign_key "repository_connections", "organizations", on_delete: :restrict
   add_foreign_key "repository_connections", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "repository_connections", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "revisions", "builds", column: ["build_id", "deployment_id", "organization_id", "artifact_digest"], primary_key: ["id", "deployment_id", "organization_id", "artifact_digest"], on_delete: :restrict
+  add_foreign_key "revisions", "configuration_snapshots", column: ["configuration_snapshot_id", "organization_id", "project_id", "environment_id", "service_id"], primary_key: ["id", "organization_id", "project_id", "environment_id", "service_id"], on_delete: :restrict
+  add_foreign_key "revisions", "deployments", column: ["deployment_id", "organization_id", "project_id", "service_id", "environment_id", "configuration_snapshot_id"], primary_key: ["id", "organization_id", "project_id", "service_id", "environment_id", "configuration_snapshot_id"], on_delete: :restrict
+  add_foreign_key "revisions", "environments", column: ["environment_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "revisions", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
+  add_foreign_key "revisions", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
   add_foreign_key "services", "projects", on_delete: :restrict
 end

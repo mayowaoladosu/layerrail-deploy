@@ -9,14 +9,14 @@ module Deployments
       "created" => %w[queued canceling failed],
       "queued" => %w[preparing canceling failed],
       "preparing" => %w[building canceling failed],
-      "building" => %w[scanning canceling failed],
+      "building" => %w[preparing scanning canceling failed],
       "scanning" => %w[deploying canceling failed],
       "deploying" => %w[verifying canceling failed],
       "verifying" => %w[ready canceling failed],
-      "ready" => %w[promoted superseded failed],
-      "promoted" => %w[superseded failed],
+      "ready" => %w[promoted superseded canceling failed],
+      "promoted" => %w[superseded canceling failed],
       "canceling" => %w[canceled failed],
-      "superseded" => [],
+      "superseded" => %w[promoted canceling],
       "canceled" => [],
       "failed" => []
     }.freeze
@@ -52,6 +52,7 @@ module Deployments
         @deployment.conclusion = conclusion_for(@to)
         @deployment.save!
         transition = @deployment.deployment_transitions.create!(
+          correlation_id: @deployment.correlation_id,
           sequence: @deployment.deployment_transitions.maximum(:sequence).to_i + 1,
           from_status: from,
           to_status: @to,
