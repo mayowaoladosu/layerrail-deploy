@@ -34,7 +34,7 @@ module RepositoryConnections
       return repository_result if repository_result.failure?
 
       repository = repository_result.value
-      ApplicationRecord.transaction do
+      @service.with_lock do
         connection = RepositoryConnection.find_or_initialize_by(service: @service)
         connection.assign_attributes(
           organization: @context.organization,
