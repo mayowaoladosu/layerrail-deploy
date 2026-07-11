@@ -11,6 +11,7 @@ module Api
       rescue_from Api::Idempotency::Execute::MissingKey, with: :render_missing_idempotency_key
       rescue_from Api::Idempotency::Execute::InvalidKey, with: :render_invalid_idempotency_key
       rescue_from Api::Idempotency::Execute::Conflict, with: :render_idempotency_conflict
+      rescue_from ActionController::ParameterMissing, with: :render_missing_parameter
       rescue_from Pundit::NotAuthorizedError, with: :render_forbidden
 
       private
@@ -38,7 +39,7 @@ module Api
       def select_organization!
         return if performed?
 
-        @current_organization = Organization.find_by(id: params[:organization_id])
+        @current_organization = Organization.find_by(id: organization_id_from_request)
         membership_exists = @current_organization && Membership.exists?(
           user_id: current_principal.id,
           organization_id: @current_organization.id
@@ -48,6 +49,10 @@ module Api
         @current_organization = nil
 
         render_error(:not_found, "organization_not_found", "Organization was not found")
+      end
+
+      def organization_id_from_request
+        params[:organization_id]
       end
 
       def render_invalid_record(error)
@@ -61,6 +66,27 @@ module Api
 
       def render_forbidden
         render_error(:forbidden, "forbidden", "You are not allowed to perform this action")
+      end
+
+      def render_not_found
+        render_error(:not_found, "not_found", "The requested resource was not found")
+      end
+
+      def render_validation_error(field, message)
+        render_error(
+          :unprocessable_content,
+          "validation_failed",
+          "The request could not be validated",
+          fields: { field.to_s => [ message ] }
+        )
+      end
+
+      def render_conflict(code, message)
+        render_error(:conflict, code, message)
+      end
+
+      def render_missing_parameter(error)
+        render_validation_error(error.param, "is required")
       end
 
       def render_missing_idempotency_key
@@ -88,6 +114,44 @@ module Api
         payload[:details] = details if details
 
         render json: payload, status:
+      end
+
+      def serialize_deployment(deployment)
+        {
+          id: deployment.id,
+          organization_id: deployment.organization_id,
+          service_id: deployment.service_id,
+          status: deployment.status,
+          source: deployment.source_snapshot,
+          preview_url: nil,
+          created_at: deployment.created_at.iso8601(6),
+          updated_at: deployment.updated_at.iso8601(6)
+        }
+      end
+
+      def serialize_operation(event)
+        {
+          id: event.id,
+          organization_id: event.organization_id,
+          resource_id: event.resource_id,
+          status: operation_status(event.status),
+          correlation_id: event.correlation_id,
+          created_at: event.created_at.iso8601(6)
+        }
+      end
+
+      def render_mutation(mutation)
+        response.set_header("Idempotency-Replayed", "true") if mutation.replayed
+        render json: mutation.body, status: mutation.status
+      end
+
+      def operation_status(status)
+        {
+          "pending" => "pending",
+          "delivering" => "running",
+          "published" => "succeeded",
+          "dead" => "failed"
+        }.fetch(status)
       end
     end
   end

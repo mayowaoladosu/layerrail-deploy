@@ -4,6 +4,11 @@ Rails.application.routes.draw do
   namespace :api, path: nil do
     namespace :v1, path: "v1" do
       resources :projects, only: :create
+      post "services/:service_id/deployments" => "deployments#create"
+      get "deployments/:deployment_id" => "deployments#show"
+      post "deployments/:deployment_id/cancel" => "deployments#cancel"
+      post "environments/:environment_id/promotions" => "environment_operations#promote"
+      post "environments/:environment_id/rollbacks" => "environment_operations#rollback"
     end
   end
 

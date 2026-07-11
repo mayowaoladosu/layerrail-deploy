@@ -3,7 +3,7 @@ module Deployments
     class InvalidTransition < StandardError; end
     class StaleTransition < StandardError; end
 
-    Result = Data.define(:deployment, :transition)
+    Result = Data.define(:deployment, :transition, :event)
 
     TRANSITIONS = {
       "created" => %w[queued canceling failed],
@@ -43,6 +43,7 @@ module Deployments
 
     def call
       transition = nil
+      event = nil
       @deployment.with_lock do
         raise StaleTransition unless @deployment.lock_version == @expected_lock_version
         raise InvalidTransition unless TRANSITIONS.fetch(@deployment.status).include?(@to)
@@ -62,10 +63,10 @@ module Deployments
           error: @error,
           occurred_at: Time.current
         )
-        Deployments::PublishTransition.call(deployment: @deployment, transition:)
+        event = Deployments::PublishTransition.call(deployment: @deployment, transition:).event
       end
 
-      Result.new(deployment: @deployment, transition:)
+      Result.new(deployment: @deployment, transition:, event:)
     end
 
     private

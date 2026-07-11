@@ -117,6 +117,7 @@ RSpec.describe "Alias promotion and rollback" do
     result = Aliases::Rollback.call(
       context:,
       alias_record:,
+      revision: first_revision,
       expected_lock_version: alias_record.lock_version
     )
 
@@ -191,6 +192,7 @@ RSpec.describe "Alias promotion and rollback" do
       Aliases::Rollback.call(
         context:,
         alias_record: alias_record.reload,
+        revision: first_revision,
         expected_lock_version: stale_version
       )
     end.to raise_error(Aliases::Rollback::StaleAlias)

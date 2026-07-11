@@ -224,6 +224,7 @@ paths:
     post:
       tags: [Environments]
       summary: Roll back to a ready revision
+      description: The selected revision must be the environment Alias's current previous ready Revision.
       operationId: rollbackEnvironment
       parameters:
         - $ref: "#/components/parameters/EnvironmentId"
@@ -527,7 +528,7 @@ components:
             - canceled
             - failed
         source:
-          $ref: "#/components/schemas/SourceSnapshot"
+          $ref: "#/components/schemas/DeploymentSourceSnapshot"
         preview_url:
           type: string
           format: uri
@@ -663,8 +664,16 @@ components:
           minLength: 1
         repository_id:
           type: string
+        commit_sha:
+          type: string
+          pattern: "^[0-9a-f]{40,64}$"
+        digest:
+          type: string
+          pattern: "^sha256:[0-9a-f]{64}$"
         root_directory:
           type: string
+          minLength: 1
+          maxLength: 1024
 
     RuntimePolicy:
       type: object
@@ -682,6 +691,42 @@ components:
           type: integer
           minimum: 1
           maximum: 300
+
+    DeploymentSourceSnapshot:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [type, reference, repository_id, commit_sha]
+          properties:
+            type:
+              type: string
+              enum: [git]
+            reference:
+              type: string
+              minLength: 1
+            repository_id:
+              type: string
+              minLength: 1
+            commit_sha:
+              type: string
+              pattern: "^[0-9a-f]{40,64}$"
+            root_directory:
+              type: string
+              minLength: 1
+              maxLength: 1024
+        - type: object
+          additionalProperties: false
+          required: [type, reference, digest]
+          properties:
+            type:
+              type: string
+              enum: [oci]
+            reference:
+              type: string
+              minLength: 1
+            digest:
+              type: string
+              pattern: "^sha256:[0-9a-f]{64}$"
 
     ResourceLifecycleState:
       type: string
@@ -737,7 +782,7 @@ components:
       required: [source]
       properties:
         source:
-          $ref: "#/components/schemas/SourceSnapshot"
+          $ref: "#/components/schemas/DeploymentSourceSnapshot"
         environment_id:
           $ref: "#/components/schemas/PublicId"
 

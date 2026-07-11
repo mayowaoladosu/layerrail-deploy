@@ -81,18 +81,29 @@ module Deployments
       raise InvalidSource unless source.is_a?(Hash)
 
       normalized = source.to_h { |key, value| [ key.to_s, value.to_s.strip ] }.sort.to_h
-      allowed = %w[type reference commit_sha repository_id digest]
+      allowed = %w[type reference commit_sha repository_id digest root_directory]
       raise InvalidSource unless (normalized.keys - allowed).empty?
       raise InvalidSource unless normalized["type"].in?(%w[git oci])
       raise InvalidSource if normalized["reference"].blank?
+      validate_root_directory!(normalized["root_directory"]) if normalized.key?("root_directory")
       if normalized["type"] == "git"
+        raise InvalidSource if normalized.key?("digest")
         raise InvalidSource unless normalized["commit_sha"]&.match?(/\A[0-9a-f]{40,64}\z/)
         raise InvalidSource if normalized["repository_id"].blank?
-      elsif normalized["digest"].blank?
-        raise InvalidSource
+      else
+        raise InvalidSource if normalized.keys.intersect?(%w[commit_sha repository_id root_directory])
+        raise InvalidSource unless normalized["digest"]&.match?(/\Asha256:[0-9a-f]{64}\z/)
       end
 
       GitProviders::Types.deep_freeze(normalized)
+    end
+
+    def validate_root_directory!(root_directory)
+      segments = root_directory.split("/")
+      raise InvalidSource if root_directory.blank? || root_directory.bytesize > 1024
+      raise InvalidSource if root_directory.start_with?("/", "\\")
+      raise InvalidSource if root_directory.include?("\\") || root_directory.include?(":")
+      raise InvalidSource if segments.any? { |segment| segment.blank? || segment.in?(%w[. ..]) }
     end
 
     def source_digest
