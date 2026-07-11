@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_214000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_215000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -66,7 +66,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_214000) do
 
   create_table "configuration_snapshots", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "created_by_id", null: false
+    t.uuid "created_by_id"
     t.uuid "environment_id", null: false
     t.jsonb "key_summary", null: false
     t.uuid "organization_id", null: false
@@ -186,6 +186,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_214000) do
     t.check_constraint "slug::text = lower(btrim(slug::text)) AND slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "environments_slug_normalized"
   end
 
+  create_table "event_receipts", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "consumed_at"
+    t.string "consumer", limit: 120, null: false
+    t.datetime "created_at", null: false
+    t.uuid "event_id", null: false
+    t.string "event_type", limit: 255, null: false
+    t.uuid "organization_id", null: false
+    t.string "payload_digest", limit: 64, null: false
+    t.jsonb "result", default: {}, null: false
+    t.string "status", limit: 32, null: false
+    t.datetime "updated_at", null: false
+    t.index ["consumer", "event_id"], name: "index_event_receipts_on_consumer_and_event_id", unique: true
+    t.index ["organization_id", "consumer", "created_at"], name: "idx_on_organization_id_consumer_created_at_3298b19f34"
+    t.index ["organization_id"], name: "index_event_receipts_on_organization_id"
+    t.check_constraint "consumer::text ~ '^[a-z][a-z0-9-]*$'::text", name: "event_receipts_consumer_format"
+    t.check_constraint "event_type::text ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+\\.v[1-9][0-9]*$'::text", name: "event_receipts_type_format"
+    t.check_constraint "jsonb_typeof(result) = 'object'::text", name: "event_receipts_result_object"
+    t.check_constraint "payload_digest::text ~ '^[0-9a-f]{64}$'::text", name: "event_receipts_payload_digest_format"
+    t.check_constraint "status::text = 'processing'::text AND consumed_at IS NULL OR status::text = 'completed'::text AND consumed_at IS NOT NULL", name: "event_receipts_lifecycle_consistent"
+    t.check_constraint "status::text = 'processing'::text OR status::text = 'completed'::text", name: "event_receipts_status_allowed"
+  end
+
   create_table "git_installations", id: :uuid, default: nil, force: :cascade do |t|
     t.string "account_id", limit: 255, null: false
     t.string "account_login", limit: 255, null: false
@@ -211,6 +233,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_214000) do
     t.datetime "created_at", null: false
     t.jsonb "data", null: false
     t.string "delivery_id", limit: 255, null: false
+    t.uuid "deployment_id"
     t.string "event_type", limit: 120, null: false
     t.uuid "git_installation_id", null: false
     t.datetime "occurred_at", null: false
@@ -222,12 +245,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_214000) do
     t.text "safe_error"
     t.string "status", limit: 32, null: false
     t.datetime "updated_at", null: false
+    t.index ["deployment_id"], name: "index_git_webhook_inboxes_on_deployment_id"
     t.index ["git_installation_id", "provider_repository_id"], name: "idx_on_git_installation_id_provider_repository_id_43d077995b"
     t.index ["organization_id", "status", "created_at"], name: "idx_on_organization_id_status_created_at_b0e5eedb6a"
     t.index ["provider", "delivery_id"], name: "index_git_webhook_inboxes_on_provider_and_delivery_id", unique: true
     t.check_constraint "jsonb_typeof(data) = 'object'::text", name: "git_webhook_inboxes_data_object"
     t.check_constraint "payload_digest::text ~ '^[0-9a-f]{64}$'::text", name: "git_webhook_inboxes_digest_format"
     t.check_constraint "provider::text = 'github'::text", name: "git_webhook_inboxes_provider_allowed"
+    t.check_constraint "safe_error IS NULL OR char_length(safe_error) <= 1000", name: "git_webhook_inboxes_safe_error_bounded"
+    t.check_constraint "status::text = 'pending'::text AND processed_at IS NULL AND deployment_id IS NULL AND safe_error IS NULL OR status::text = 'processed'::text AND processed_at IS NOT NULL AND safe_error IS NULL OR status::text = 'failed'::text AND processed_at IS NOT NULL AND deployment_id IS NULL AND safe_error = btrim(safe_error) AND safe_error <> ''::text", name: "git_webhook_inboxes_processing_consistent"
     t.check_constraint "status::text = 'pending'::text OR status::text = 'processed'::text OR status::text = 'failed'::text", name: "git_webhook_inboxes_status_allowed"
   end
 
@@ -270,6 +296,42 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_214000) do
     t.string "name", limit: 120, null: false
     t.datetime "updated_at", null: false
     t.check_constraint "btrim(name::text) <> ''::text", name: "organizations_name_present"
+  end
+
+  create_table "outbox_events", id: :uuid, default: nil, force: :cascade do |t|
+    t.integer "attempt_count", default: 0, null: false
+    t.datetime "available_at", null: false
+    t.uuid "claim_token"
+    t.uuid "correlation_id", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "data", null: false
+    t.string "data_digest", limit: 64, null: false
+    t.string "event_type", limit: 255, null: false
+    t.string "idempotency_key", limit: 255, null: false
+    t.string "last_error", limit: 1000
+    t.integer "lock_version", default: 0, null: false
+    t.datetime "locked_until"
+    t.datetime "occurred_at", null: false
+    t.uuid "organization_id", null: false
+    t.string "producer", limit: 63, null: false
+    t.datetime "published_at"
+    t.uuid "resource_id", null: false
+    t.integer "schema_version", default: 1, null: false
+    t.string "status", limit: 32, default: "pending", null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id", "producer", "idempotency_key"], name: "index_outbox_events_on_producer_idempotency", unique: true
+    t.index ["organization_id", "status", "created_at"], name: "idx_on_organization_id_status_created_at_1118c31bba"
+    t.index ["organization_id"], name: "index_outbox_events_on_organization_id"
+    t.index ["status", "available_at", "locked_until", "created_at"], name: "index_outbox_events_for_dispatch"
+    t.check_constraint "attempt_count >= 0", name: "outbox_events_attempt_count_nonnegative"
+    t.check_constraint "data_digest::text ~ '^[0-9a-f]{64}$'::text", name: "outbox_events_data_digest_format"
+    t.check_constraint "event_type::text ~ '^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+\\.v[1-9][0-9]*$'::text", name: "outbox_events_type_format"
+    t.check_constraint "idempotency_key::text = btrim(idempotency_key::text) AND idempotency_key::text <> ''::text", name: "outbox_events_idempotency_key_normalized"
+    t.check_constraint "jsonb_typeof(data) = 'object'::text", name: "outbox_events_data_object"
+    t.check_constraint "producer::text ~ '^[a-z][a-z0-9-]*$'::text", name: "outbox_events_producer_format"
+    t.check_constraint "schema_version = 1", name: "outbox_events_schema_version"
+    t.check_constraint "status::text = 'pending'::text AND claim_token IS NULL AND locked_until IS NULL AND published_at IS NULL OR status::text = 'delivering'::text AND claim_token IS NOT NULL AND locked_until IS NOT NULL AND published_at IS NULL OR status::text = 'published'::text AND claim_token IS NULL AND locked_until IS NULL AND published_at IS NOT NULL OR status::text = 'dead'::text AND claim_token IS NULL AND locked_until IS NULL AND published_at IS NULL", name: "outbox_events_delivery_state_consistent"
+    t.check_constraint "status::text = 'pending'::text OR status::text = 'delivering'::text OR status::text = 'published'::text OR status::text = 'dead'::text", name: "outbox_events_status_allowed"
   end
 
   create_table "projects", id: :uuid, default: nil, force: :cascade do |t|
@@ -403,11 +465,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_214000) do
   add_foreign_key "deployments", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "deployments", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
   add_foreign_key "environments", "projects", on_delete: :restrict
+  add_foreign_key "event_receipts", "organizations", on_delete: :restrict
   add_foreign_key "git_installations", "organizations", on_delete: :restrict
+  add_foreign_key "git_webhook_inboxes", "deployments", column: ["deployment_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "git_webhook_inboxes", "git_installations", column: ["git_installation_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "idempotency_records", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "users", on_delete: :restrict
+  add_foreign_key "outbox_events", "organizations", on_delete: :restrict
   add_foreign_key "projects", "organizations", on_delete: :restrict
   add_foreign_key "repository_connections", "git_installations", column: ["git_installation_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "repository_connections", "organizations", on_delete: :restrict

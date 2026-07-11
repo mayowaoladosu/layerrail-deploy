@@ -1,0 +1,20 @@
+{
+  "event_id": "019b9a80-0000-7000-8000-000000000010",
+  "event_type": "deployment.requested.v1",
+  "occurred_at": "2026-07-11T22:00:00Z",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "resource_id": "019b9a80-0000-7000-8000-000000000003",
+  "correlation_id": "019b9a80-0000-7000-8000-000000000004",
+  "idempotency_key": "deployment:019b9a80-0000-7000-8000-000000000003:requested",
+  "producer": "control-plane",
+  "schema_version": 1,
+  "data": {
+    "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+    "service_id": "019b9a80-0000-7000-8000-000000000011",
+    "environment_id": "019b9a80-0000-7000-8000-000000000012",
+    "configuration_snapshot_id": "019b9a80-0000-7000-8000-000000000013",
+    "source_digest": "8e785f6f5f35dbf8f6e6f08d517f56bf1822b4e225dc5f402f294bbf4e2f1c41",
+    "expected_version": 0,
+    "trigger": "webhook"
+  }
+}

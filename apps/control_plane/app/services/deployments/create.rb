@@ -62,12 +62,14 @@ module Deployments
           sequence: 1,
           from_status: nil,
           to_status: "created",
-          actor_type: "user",
-          actor_id: @context.principal.id,
+          actor_type: @context.system? ? "system" : "user",
+          actor_id: @context.principal&.id,
           cause: @trigger.to_s,
           error: {},
           occurred_at: Time.current
         )
+        Deployments::PublishTransition.call(deployment: candidate, transition:)
+        publish_request!(candidate)
 
         Result.new(deployment: candidate, replayed: false)
       end
@@ -111,7 +113,29 @@ module Deployments
         raise IdempotencyConflict
       end
 
+      publish_request!(existing)
+
       Result.new(deployment: existing, replayed: true)
+    end
+
+    def publish_request!(deployment)
+      OutboxEvents::Publish.call(
+        organization: deployment.organization,
+        resource_id: deployment.id,
+        event_type: "deployment.requested.v1",
+        correlation_id: deployment.correlation_id,
+        idempotency_key: "deployment:#{deployment.id}:requested",
+        producer: "control-plane",
+        data: {
+          "deployment_id" => deployment.id,
+          "service_id" => deployment.service_id,
+          "environment_id" => deployment.environment_id,
+          "configuration_snapshot_id" => deployment.configuration_snapshot_id,
+          "source_digest" => deployment.source_digest,
+          "expected_version" => 0,
+          "trigger" => deployment.trigger
+        }
+      )
     end
 
     def authorize!(candidate)

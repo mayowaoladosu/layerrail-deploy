@@ -38,7 +38,10 @@ module Aliases
           name: @name
         )
         alias_record.lock! if alias_record.persisted?
-        return Result.new(alias_record:) if alias_record.current_revision_id == @revision.id
+        if alias_record.current_revision_id == @revision.id
+          publish_routing!(alias_record)
+          return Result.new(alias_record:)
+        end
 
         old_revision = alias_record.current_revision
         unless alias_record.persisted?
@@ -58,6 +61,7 @@ module Aliases
         alias_record.save!
         promote_deployment!(@revision.deployment)
         supersede_deployment!(old_revision&.deployment)
+        publish_routing!(alias_record)
 
         Result.new(alias_record:)
       end
@@ -100,6 +104,27 @@ module Aliases
         actor: @context.principal,
         cause: "alias_superseded",
         expected_lock_version: deployment.lock_version
+      )
+    end
+
+    def publish_routing!(alias_record)
+      OutboxEvents::Publish.call(
+        organization: alias_record.organization,
+        resource_id: alias_record.id,
+        event_type: "alias.routing.requested.v1",
+        correlation_id: @revision.deployment.correlation_id,
+        idempotency_key: "alias:#{alias_record.id}:version:#{alias_record.lock_version}:routing",
+        producer: "control-plane",
+        data: {
+          "alias_id" => alias_record.id,
+          "alias_type" => alias_record.alias_type,
+          "name" => alias_record.name,
+          "service_id" => alias_record.service_id,
+          "environment_id" => alias_record.environment_id,
+          "current_revision_id" => alias_record.current_revision_id,
+          "previous_revision_id" => alias_record.previous_revision_id,
+          "expected_version" => alias_record.lock_version
+        }
       )
     end
   end

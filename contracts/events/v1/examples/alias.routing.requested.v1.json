@@ -1,0 +1,21 @@
+{
+  "event_id": "019b9a80-0000-7000-8000-000000000030",
+  "event_type": "alias.routing.requested.v1",
+  "occurred_at": "2026-07-11T22:02:00Z",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "resource_id": "019b9a80-0000-7000-8000-000000000031",
+  "correlation_id": "019b9a80-0000-7000-8000-000000000004",
+  "idempotency_key": "alias:019b9a80-0000-7000-8000-000000000031:version:2:routing",
+  "producer": "control-plane",
+  "schema_version": 1,
+  "data": {
+    "alias_id": "019b9a80-0000-7000-8000-000000000031",
+    "alias_type": "environment",
+    "name": "production",
+    "service_id": "019b9a80-0000-7000-8000-000000000011",
+    "environment_id": "019b9a80-0000-7000-8000-000000000012",
+    "current_revision_id": "019b9a80-0000-7000-8000-000000000032",
+    "previous_revision_id": "019b9a80-0000-7000-8000-000000000033",
+    "expected_version": 2
+  }
+}

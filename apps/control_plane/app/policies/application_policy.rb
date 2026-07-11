@@ -44,4 +44,8 @@ class ApplicationPolicy
   def member_of_selected_organization?
     context&.member? && context.selected?(record)
   end
+
+  def system_of_selected_organization?
+    context&.system? && context.selected?(record)
+  end
 end

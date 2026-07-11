@@ -78,6 +78,17 @@ RSpec.describe "Alias promotion and rollback" do
     )
     expect(first_deployment.reload.status).to eq("superseded")
     expect(second_deployment.reload.status).to eq("promoted")
+    routing_event = OutboxEvent.find_by!(
+      resource_id: second.alias_record.id,
+      event_type: "alias.routing.requested.v1",
+      idempotency_key: "alias:#{second.alias_record.id}:version:#{second.alias_record.lock_version}:routing"
+    )
+    expect(routing_event.data).to include(
+      "alias_id" => second.alias_record.id,
+      "current_revision_id" => second_revision.id,
+      "previous_revision_id" => first_revision.id,
+      "expected_version" => second.alias_record.lock_version
+    )
   end
 
   it "rolls back to the previous ready revision without creating a build" do

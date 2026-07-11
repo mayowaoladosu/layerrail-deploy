@@ -4,6 +4,8 @@ RSpec.describe "Configuration snapshot concurrency" do
   self.use_transactional_tests = false
 
   after do
+    EventReceipt.delete_all
+    OutboxEvent.delete_all
     ConfigurationVersion.delete_all
     GitWebhookInbox.delete_all
     RepositoryConnection.delete_all

@@ -10,7 +10,7 @@ RSpec.describe "Versioned contracts" do
   let(:contracts_root) { Pathname(ENV.fetch("LRAIL_CONTRACTS_DIR", repository_root.join("contracts"))) }
   let(:openapi_path) { contracts_root.join("openapi/v1/openapi.yaml") }
   let(:event_schema_path) { contracts_root.join("events/v1/event-envelope.schema.json") }
-  let(:event_example_path) { contracts_root.join("events/v1/examples/deployment.build.completed.v1.json") }
+  let(:event_example_paths) { contracts_root.join("events/v1/examples").glob("*.json").sort }
 
   describe "the public REST API" do
     let(:required_operations) do
@@ -75,17 +75,18 @@ RSpec.describe "Versioned contracts" do
   end
 
   describe "the canonical event envelope" do
-    it "is a valid JSON Schema and accepts the versioned example" do
+    it "is a valid JSON Schema and accepts every versioned example" do
       schema = JSON.parse(event_schema_path.read)
-      example = JSON.parse(event_example_path.read)
 
       expect(JSONSchemer.valid_schema?(schema)).to be(true)
-      expect(JSONSchemer.schema(schema)).to be_valid(example)
+      event_example_paths.each do |path|
+        expect(JSONSchemer.schema(schema)).to be_valid(JSON.parse(path.read)), path.to_s
+      end
     end
 
     it "rejects an event without its tenant owner" do
       schema = JSON.parse(event_schema_path.read)
-      example = JSON.parse(event_example_path.read).except("organization_id")
+      example = JSON.parse(event_example_paths.first.read).except("organization_id")
 
       expect(JSONSchemer.schema(schema)).not_to be_valid(example)
     end

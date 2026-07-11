@@ -11,7 +11,7 @@ class ConfigurationSnapshot < ApplicationRecord
     class_name: "ConfigurationVersion",
     optional: true,
     inverse_of: :service_configuration_snapshots
-  belongs_to :created_by, class_name: "User"
+  belongs_to :created_by, class_name: "User", optional: true
   has_many :deployments, dependent: :restrict_with_exception
 
   encrypts :payload_json

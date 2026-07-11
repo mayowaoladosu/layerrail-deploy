@@ -62,6 +62,7 @@ module Deployments
           error: @error,
           occurred_at: Time.current
         )
+        Deployments::PublishTransition.call(deployment: @deployment, transition:)
       end
 
       Result.new(deployment: @deployment, transition:)

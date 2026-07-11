@@ -4,6 +4,8 @@ RSpec.describe "Idempotency concurrency" do
   self.use_transactional_tests = false
 
   after do
+    EventReceipt.delete_all
+    OutboxEvent.delete_all
     IdempotencyRecord.delete_all
     Membership.delete_all
     Organization.delete_all

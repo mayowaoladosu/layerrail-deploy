@@ -1,0 +1,22 @@
+{
+  "event_id": "019b9a80-0000-7000-8000-000000000020",
+  "event_type": "deployment.transitioned.v1",
+  "occurred_at": "2026-07-11T22:01:00Z",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "resource_id": "019b9a80-0000-7000-8000-000000000003",
+  "correlation_id": "019b9a80-0000-7000-8000-000000000004",
+  "idempotency_key": "deployment:019b9a80-0000-7000-8000-000000000003:transition:2",
+  "producer": "control-plane",
+  "schema_version": 1,
+  "data": {
+    "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+    "transition_id": "019b9a80-0000-7000-8000-000000000021",
+    "sequence": 2,
+    "from_status": "created",
+    "to_status": "queued",
+    "cause": "workflow_queued",
+    "actor_type": "system",
+    "expected_version": 1,
+    "error": {}
+  }
+}

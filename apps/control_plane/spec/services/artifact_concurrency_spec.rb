@@ -4,15 +4,17 @@ RSpec.describe "Build and Alias concurrency" do
   self.use_transactional_tests = false
 
   after do
+    EventReceipt.delete_all
+    OutboxEvent.delete_all
     Alias.delete_all
     Revision.delete_all
     Build.delete_all
+    GitWebhookInbox.delete_all
     DeploymentTransition.delete_all
     Deployment.delete_all
     ConfigurationSnapshot.delete_all
     ConfigurationVersion.delete_all
     RepositoryConnection.delete_all
-    GitWebhookInbox.delete_all
     GitInstallation.delete_all
     Service.delete_all
     Environment.delete_all
