@@ -22,6 +22,7 @@ class Service < ApplicationRecord
   MAX_RUNTIME_POLICY_BYTES = 16.kilobytes
 
   belongs_to :project
+  has_one :repository_connection, dependent: :restrict_with_exception
 
   delegate :organization, :organization_id, to: :project
 

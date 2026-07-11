@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_205000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -34,6 +34,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_205000) do
     t.check_constraint "kind::text = 'production'::text OR kind::text = 'staging'::text OR kind::text = 'custom'::text", name: "environments_kind_allowed"
     t.check_constraint "lifecycle_state::text = 'active'::text OR lifecycle_state::text = 'deletion_requested'::text OR lifecycle_state::text = 'draining'::text OR lifecycle_state::text = 'deleting_resources'::text OR lifecycle_state::text = 'tombstoned'::text OR lifecycle_state::text = 'permanently_deleted'::text", name: "environments_lifecycle_state_allowed"
     t.check_constraint "slug::text = lower(btrim(slug::text)) AND slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "environments_slug_normalized"
+  end
+
+  create_table "git_installations", id: :uuid, default: nil, force: :cascade do |t|
+    t.string "account_id", limit: 255, null: false
+    t.string "account_login", limit: 255, null: false
+    t.string "account_type", limit: 32, null: false
+    t.datetime "created_at", null: false
+    t.uuid "organization_id", null: false
+    t.jsonb "permissions", default: {}, null: false
+    t.string "provider", limit: 32, null: false
+    t.string "provider_installation_id", limit: 255, null: false
+    t.string "status", limit: 32, null: false
+    t.datetime "updated_at", null: false
+    t.index ["id", "organization_id"], name: "index_git_installations_on_id_and_organization_id", unique: true
+    t.index ["organization_id", "provider"], name: "index_git_installations_on_organization_id_and_provider"
+    t.index ["organization_id"], name: "index_git_installations_on_organization_id"
+    t.index ["provider", "provider_installation_id"], name: "idx_on_provider_provider_installation_id_eb69f10f93", unique: true
+    t.check_constraint "account_type::text = 'organization'::text OR account_type::text = 'user'::text", name: "git_installations_account_type_allowed"
+    t.check_constraint "jsonb_typeof(permissions) = 'object'::text", name: "git_installations_permissions_object"
+    t.check_constraint "provider::text = 'github'::text", name: "git_installations_provider_allowed"
+    t.check_constraint "status::text = 'active'::text OR status::text = 'suspended'::text OR status::text = 'disconnected'::text", name: "git_installations_status_allowed"
   end
 
   create_table "idempotency_records", id: :uuid, default: nil, force: :cascade do |t|
@@ -85,12 +106,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_205000) do
     t.string "slug", limit: 64, null: false
     t.datetime "updated_at", null: false
     t.index "organization_id, lower((name)::text)", name: "index_projects_on_organization_and_lower_name", unique: true
+    t.index ["id", "organization_id"], name: "index_projects_on_id_and_organization_id", unique: true
     t.index ["organization_id", "lifecycle_state"], name: "index_projects_on_organization_id_and_lifecycle_state"
     t.index ["organization_id", "slug"], name: "index_projects_on_organization_id_and_slug", unique: true
     t.index ["organization_id"], name: "index_projects_on_organization_id"
     t.check_constraint "btrim(name::text) <> ''::text", name: "projects_name_present"
     t.check_constraint "lifecycle_state::text = 'active'::text OR lifecycle_state::text = 'deletion_requested'::text OR lifecycle_state::text = 'draining'::text OR lifecycle_state::text = 'deleting_resources'::text OR lifecycle_state::text = 'tombstoned'::text OR lifecycle_state::text = 'permanently_deleted'::text", name: "projects_lifecycle_state_allowed"
     t.check_constraint "slug::text = lower(btrim(slug::text)) AND slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "projects_slug_normalized"
+  end
+
+  create_table "repository_connections", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "default_branch", limit: 255, null: false
+    t.string "full_name", limit: 255, null: false
+    t.uuid "git_installation_id", null: false
+    t.string "name", limit: 255, null: false
+    t.uuid "organization_id", null: false
+    t.string "owner", limit: 255, null: false
+    t.boolean "private", null: false
+    t.uuid "project_id", null: false
+    t.string "provider_repository_id", limit: 255, null: false
+    t.uuid "service_id", null: false
+    t.string "status", limit: 32, default: "active", null: false
+    t.datetime "updated_at", null: false
+    t.index ["git_installation_id", "provider_repository_id"], name: "index_repository_connections_on_installation_and_repository", unique: true
+    t.index ["id", "organization_id"], name: "index_repository_connections_on_id_and_organization_id", unique: true
+    t.index ["organization_id", "status"], name: "index_repository_connections_on_organization_id_and_status"
+    t.index ["organization_id"], name: "index_repository_connections_on_organization_id"
+    t.index ["project_id", "organization_id"], name: "index_repository_connections_on_project_id_and_organization_id"
+    t.index ["service_id", "project_id"], name: "index_repository_connections_on_service_id_and_project_id"
+    t.index ["service_id"], name: "index_repository_connections_on_service_id", unique: true
+    t.check_constraint "status::text = 'active'::text OR status::text = 'removed'::text OR status::text = 'disconnected'::text", name: "repository_connections_status_allowed"
   end
 
   create_table "services", id: :uuid, default: nil, force: :cascade do |t|
@@ -104,6 +150,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_205000) do
     t.datetime "updated_at", null: false
     t.string "workload_type", limit: 16, null: false
     t.index "project_id, lower((name)::text)", name: "index_services_on_project_and_lower_name", unique: true
+    t.index ["id", "project_id"], name: "index_services_on_id_and_project_id", unique: true
     t.index ["project_id", "lifecycle_state"], name: "index_services_on_project_id_and_lifecycle_state"
     t.index ["project_id", "workload_type"], name: "index_services_on_project_id_and_workload_type"
     t.index ["project_id"], name: "index_services_on_project_id"
@@ -126,9 +173,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_205000) do
   end
 
   add_foreign_key "environments", "projects", on_delete: :restrict
+  add_foreign_key "git_installations", "organizations", on_delete: :restrict
   add_foreign_key "idempotency_records", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "users", on_delete: :restrict
   add_foreign_key "projects", "organizations", on_delete: :restrict
+  add_foreign_key "repository_connections", "git_installations", column: ["git_installation_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
+  add_foreign_key "repository_connections", "organizations", on_delete: :restrict
+  add_foreign_key "repository_connections", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
+  add_foreign_key "repository_connections", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
   add_foreign_key "services", "projects", on_delete: :restrict
 end
