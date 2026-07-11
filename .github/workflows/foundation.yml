@@ -33,6 +33,7 @@ jobs:
       POSTGRES_PASSWORD: lrail_test_password
       CONTROL_PLANE_TEST_DATABASE: lrail_control_plane_test
       RAILS_DUMP_SCHEMA: "true"
+      RAILS_ENCRYPTION_KEY: lrail-ci-encryption-key-not-for-production
     defaults:
       run:
         working-directory: apps/control_plane

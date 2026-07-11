@@ -10,9 +10,32 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_211000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_212000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "configuration_versions", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id", null: false
+    t.uuid "environment_id", null: false
+    t.jsonb "key_summary", null: false
+    t.uuid "organization_id", null: false
+    t.string "payload_digest", limit: 64, null: false
+    t.text "payload_json", null: false
+    t.uuid "project_id", null: false
+    t.string "scope_key", limit: 255, null: false
+    t.uuid "service_id"
+    t.datetime "updated_at", null: false
+    t.integer "version", null: false
+    t.index ["created_by_id"], name: "index_configuration_versions_on_created_by_id"
+    t.index ["environment_id", "scope_key", "version"], name: "index_configuration_versions_on_environment_scope_version", unique: true
+    t.index ["organization_id", "project_id", "environment_id"], name: "index_configuration_versions_on_tenant_scope"
+    t.index ["service_id", "environment_id"], name: "index_configuration_versions_on_service_id_and_environment_id"
+    t.check_constraint "jsonb_typeof(key_summary) = 'array'::text", name: "configuration_versions_key_summary_array"
+    t.check_constraint "payload_digest::text ~ '^[0-9a-f]{64}$'::text", name: "configuration_versions_digest_format"
+    t.check_constraint "service_id IS NULL AND scope_key::text = 'project'::text OR service_id IS NOT NULL AND scope_key::text = ('service:'::text || service_id::text)", name: "configuration_versions_scope_matches_service"
+    t.check_constraint "version > 0", name: "configuration_versions_version_positive"
+  end
 
   create_table "environments", id: :uuid, default: nil, force: :cascade do |t|
     t.string "branch", limit: 255
@@ -23,6 +46,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_211000) do
     t.uuid "project_id", null: false
     t.string "slug", limit: 64, null: false
     t.datetime "updated_at", null: false
+    t.index ["id", "project_id"], name: "index_environments_on_id_and_project_id", unique: true
     t.index ["project_id", "branch"], name: "index_environments_on_project_id_and_branch", unique: true, where: "(branch IS NOT NULL)"
     t.index ["project_id", "lifecycle_state"], name: "index_environments_on_project_id_and_lifecycle_state"
     t.index ["project_id", "slug"], name: "index_environments_on_project_id_and_slug", unique: true
@@ -196,6 +220,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_211000) do
     t.check_constraint "email::text = lower(btrim(email::text))", name: "users_email_normalized"
   end
 
+  add_foreign_key "configuration_versions", "environments", column: ["environment_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "configuration_versions", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
+  add_foreign_key "configuration_versions", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
+  add_foreign_key "configuration_versions", "users", column: "created_by_id", on_delete: :restrict
   add_foreign_key "environments", "projects", on_delete: :restrict
   add_foreign_key "git_installations", "organizations", on_delete: :restrict
   add_foreign_key "git_webhook_inboxes", "git_installations", column: ["git_installation_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
