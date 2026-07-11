@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_203000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_204000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -72,6 +72,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_203000) do
     t.check_constraint "slug::text = lower(btrim(slug::text)) AND slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "projects_slug_normalized"
   end
 
+  create_table "services", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "lifecycle_state", limit: 32, default: "active", null: false
+    t.string "name", limit: 120, null: false
+    t.uuid "project_id", null: false
+    t.jsonb "runtime_policy", default: {}, null: false
+    t.string "source_reference", limit: 2048, null: false
+    t.string "source_type", limit: 8, null: false
+    t.datetime "updated_at", null: false
+    t.string "workload_type", limit: 16, null: false
+    t.index "project_id, lower((name)::text)", name: "index_services_on_project_and_lower_name", unique: true
+    t.index ["project_id", "lifecycle_state"], name: "index_services_on_project_id_and_lifecycle_state"
+    t.index ["project_id", "workload_type"], name: "index_services_on_project_id_and_workload_type"
+    t.index ["project_id"], name: "index_services_on_project_id"
+    t.check_constraint "btrim(name::text) <> ''::text", name: "services_name_present"
+    t.check_constraint "jsonb_typeof(runtime_policy) = 'object'::text", name: "services_runtime_policy_object"
+    t.check_constraint "lifecycle_state::text = 'active'::text OR lifecycle_state::text = 'deletion_requested'::text OR lifecycle_state::text = 'draining'::text OR lifecycle_state::text = 'deleting_resources'::text OR lifecycle_state::text = 'tombstoned'::text OR lifecycle_state::text = 'permanently_deleted'::text", name: "services_lifecycle_state_allowed"
+    t.check_constraint "source_reference::text = btrim(source_reference::text) AND source_reference::text <> ''::text", name: "services_source_reference_normalized"
+    t.check_constraint "source_type::text = 'git'::text OR source_type::text = 'oci'::text", name: "services_source_type_allowed"
+    t.check_constraint "workload_type::text = 'static'::text OR workload_type::text = 'web'::text OR workload_type::text = 'private'::text OR workload_type::text = 'worker'::text OR workload_type::text = 'cron'::text OR workload_type::text = 'job'::text", name: "services_workload_type_allowed"
+  end
+
   create_table "users", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email", limit: 320, null: false
@@ -86,4 +108,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_203000) do
   add_foreign_key "memberships", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "users", on_delete: :restrict
   add_foreign_key "projects", "organizations", on_delete: :restrict
+  add_foreign_key "services", "projects", on_delete: :restrict
 end

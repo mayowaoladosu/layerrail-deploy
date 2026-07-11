@@ -22,11 +22,16 @@ class Environment < ApplicationRecord
     uniqueness: { scope: :project_id }
   validates :branch, length: { maximum: 255 }, uniqueness: { scope: :project_id }, allow_nil: true
   validates :kind, uniqueness: { scope: :project_id }, if: :canonical_kind?
+  validate :kind_is_immutable, on: :update
 
   private
 
   def canonical_kind?
     kind.in?(%w[production staging])
+  end
+
+  def kind_is_immutable
+    errors.add(:kind, "cannot be changed") if will_save_change_to_kind?
   end
 
   def normalize_attributes
