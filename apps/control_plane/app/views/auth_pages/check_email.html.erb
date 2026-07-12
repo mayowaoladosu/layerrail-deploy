@@ -1,16 +1,16 @@
 <% content_for :title, "Check your email" %>
 
-<main id="main-content" class="legacy-auth-main">
-  <div class="legacy-auth-stack legacy-auth-message">
-    <h1>Check your email</h1>
-    <p>If the address can sign in, a secure link is on its way. It expires after 15 minutes.</p>
+<main id="main-content" class="flex flex-col items-center justify-center h-[calc(100vh-65px)]">
+  <div class="w-full max-w-xs space-y-6 text-center">
+    <h1 class="h2">Check your email</h1>
+    <p class="text-muted-foreground">If the address can sign in, a secure link is on its way. It expires after 15 minutes.</p>
 
     <% if @development_verification_url %>
       <%= link_to "Open the local sign-in link",
         @development_verification_url,
-        class: "legacy-auth-button legacy-auth-button-primary" %>
+        class: "btn w-full" %>
     <% end %>
 
-    <%= link_to "Use a different email", rodauth.login_path, class: "legacy-auth-link" %>
+    <%= link_to "Use a different email", rodauth.login_path, class: "font-medium underline underline-offset-4" %>
   </div>
 </main>

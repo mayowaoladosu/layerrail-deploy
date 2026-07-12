@@ -15,8 +15,8 @@ RSpec.describe "Rodauth browser authentication", type: :request do
     expect(response.body).to include(
       "Sign in to LayerRail Deploy",
       "Continue with email",
-      "legacy-auth-main",
-      "auth-site-logo"
+      "legacy-assets/styles.css",
+      "sticky top-0 bg-background z-20 border-b px-8"
     )
     expect(response.body.include?("Continue with GitHub")).to eq(github_configured?)
     expect(response.body).not_to include("auth-brand", "Ship code without surrendering control")
@@ -66,13 +66,17 @@ RSpec.describe "Rodauth browser authentication", type: :request do
     expect(set_cookie).not_to include(key.downcase)
 
     follow_redirect!
+    user = User.sole
+    organization = user.organizations.sole
+    expect(response).to redirect_to(team_path(organization.slug))
+    follow_redirect!
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Welcome, Browser User")
-    expect(User.sole).to have_attributes(
+    expect(response.body).to include("Browser User Organization", "Deploy your first project.")
+    expect(user).to have_attributes(
       email: "browser.user@example.com",
       authentication_state: "active"
     )
-    expect(Organization.sole.memberships.sole).to have_attributes(user: User.sole, role: "owner")
+    expect(organization.memberships.sole).to have_attributes(user:, role: "owner")
     expect(RodauthLoginClaim.sole.token_digest).to eq(Digest::SHA256.hexdigest(key))
   end
 

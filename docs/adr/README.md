@@ -17,3 +17,4 @@ Each record includes its status, date, relevant requirements, context, decision 
 - [ADR-009: Temporal workflow boundary](0009-temporal-workflow-boundary.md)
 - [ADR-010: Alpha artifact services and immutable publication](0010-alpha-artifact-services.md)
 - [ADR-011: Rodauth authentication boundary](0011-rodauth-authentication-boundary.md)
+- [ADR-012: Legacy Devpush dashboard presentation contract](0012-legacy-dashboard-presentation-contract.md)

@@ -1,4 +1,75 @@
 module ApplicationHelper
+  LEGACY_AVATAR_COLORS = %w[blue cyan emerald fuchsia green indigo orange pink purple red sky teal violet yellow].freeze
+
+  def legacy_icon(name)
+    raise ArgumentError, "invalid icon name" unless name.to_s.match?(/\A[a-z0-9-]+\z/)
+
+    path = Rails.configuration.x.legacy_ui_root.join("templates/icons/#{name}.svg")
+    raise ArgumentError, "unknown legacy icon" unless path.file?
+
+    path.binread.html_safe
+  end
+
+  def legacy_avatar(item, size: :default, round: false)
+    dimensions, text = {
+      xs: [ "size-5 rounded text-xs font-semibold", "text-xs" ],
+      sm: [ "size-6 rounded-md text-sm font-semibold", "text-sm" ],
+      md: [ "size-10 rounded-lg text-xl font-medium", "text-xl" ],
+      lg: [ "size-14 rounded-xl text-4xl font-medium", "text-4xl" ],
+      default: [ "size-8 rounded-lg text-lg font-semibold", "text-lg" ]
+    }.fetch(size)
+    color = LEGACY_AVATAR_COLORS[Digest::SHA256.hexdigest(item.id.to_s).to_i(16) % LEGACY_AVATAR_COLORS.length]
+    classes = [
+      "flex items-center justify-center uppercase bg-gradient-to-tl border shrink-0",
+      dimensions,
+      "from-#{color}-100 to-#{color}-100/50 border-#{color}-200",
+      "dark:from-#{color}-950/50 dark:to-#{color}-950 dark:border-#{color}-900 text-#{color}-500",
+      ("!rounded-full" if round),
+      text
+    ].compact.join(" ")
+    label = item.respond_to?(:name) ? item.name : item.to_s
+    content_tag(:div, label.to_s.first.upcase, class: classes, aria: { hidden: true })
+  end
+
+  def legacy_status(deployment, compact: false)
+    tone, label, icon, animation = case deployment.status
+    when "ready", "promoted"
+      [ "text-green-600 dark:text-green-500", "Succeeded", "circle-check", nil ]
+    when "failed"
+      [ "text-destructive", "Failed", "circle-x", nil ]
+    when "canceled"
+      [ "text-muted-foreground", "Canceled", "circle-x", nil ]
+    when "superseded"
+      [ "text-muted-foreground", "Skipped", "circle-arrow-right", nil ]
+    else
+      [ "text-muted-foreground", "In progress", "loader", "[&>svg]:animate-spin" ]
+    end
+    content_tag(:span,
+      safe_join([ legacy_icon(icon), (label unless compact) ].compact, ""),
+      class: "#{tone} [&>svg]:#{tone} [&>svg]:size-4 flex items-center gap-x-2 #{animation}",
+      data: { tooltip: label })
+  end
+
+  def legacy_environment_color(environment)
+    {
+      "production" => "green",
+      "staging" => "amber",
+      "custom" => "blue"
+    }.fetch(environment.kind, "blue")
+  end
+
+  def legacy_deployment_path(deployment)
+    project_deployment_path(
+      deployment.organization.slug,
+      deployment.project.slug,
+      deployment
+    )
+  end
+
+  def legacy_deployments_path(project, **query)
+    project_deployments_path(project.organization.slug, project.slug, **query)
+  end
+
   def deployment_status_label(status)
     {
       "created" => "Created",

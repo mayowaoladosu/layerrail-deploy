@@ -1,22 +1,22 @@
 <% content_for :title, "Finish signing in" %>
 
-<main id="main-content" class="legacy-auth-main">
-  <div class="legacy-auth-stack legacy-auth-message">
-    <h1>Finish signing in</h1>
-    <p>Confirm this browser to use the secure, one-time link.</p>
+<main id="main-content" class="flex flex-col items-center justify-center h-[calc(100vh-65px)]">
+  <div class="w-full max-w-xs space-y-6 text-center">
+    <h1 class="h2">Finish signing in</h1>
+    <p class="text-muted-foreground">Confirm this browser to use the secure, one-time link.</p>
 
     <%= form_with url: rodauth.email_auth_path,
       method: :post,
-      class: "legacy-auth-form",
+      class: "form grid gap-4",
       data: {
         turbo: false,
         controller: "auth-submit",
         action: "submit->auth-submit#start"
       } do |form| %>
       <%= form.submit "Continue with email",
-        class: "legacy-auth-button legacy-auth-button-primary",
+        class: "btn w-full",
         data: { auth_submit_target: "button" } %>
-      <span class="legacy-auth-spinner legacy-auth-spinner-centered" hidden data-auth-submit-target="spinner" aria-hidden="true"></span>
+      <span class="[&>svg]:size-4 [&>svg]:animate-spin" hidden data-auth-submit-target="spinner" aria-hidden="true"><%= legacy_icon("loader") %></span>
     <% end %>
   </div>
 </main>

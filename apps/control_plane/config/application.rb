@@ -36,6 +36,10 @@ module ControlPlane
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
 
+    config.x.legacy_ui_root = Pathname(
+      ENV.fetch("LEGACY_UI_ROOT", root.join("../../app").expand_path.to_s)
+    )
+
     config.generators do |generate|
       generate.system_tests = nil
       generate.test_framework :rspec

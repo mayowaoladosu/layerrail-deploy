@@ -1,33 +1,14 @@
-<% content_for :title, "#{@deployment.service.name} deployment · LayerRail Deploy" %>
+<% content_for :title, "Deployment #{@deployment.id.first(7)} · LayerRail Deploy" %>
+<%= render "shared/legacy_header" %>
 
-<%= render "shared/app_header" %>
+<main id="main-content" class="container max-w-screen-xl mx-auto p-8 space-y-6">
+  <div id="deployment-page-header" class="space-y-6">
+    <%= render "deployments/header" %>
+  </div>
 
-<main id="main-content" class="app-shell deployment-detail">
-  <nav class="breadcrumbs" aria-label="Breadcrumb">
-    <%= link_to "Organizations", root_path %>
-    <span aria-hidden="true">/</span>
-    <%= link_to current_organization.name, organization_deployments_path(current_organization) %>
-    <span aria-hidden="true">/</span>
-    <span aria-current="page"><%= short_public_id(@deployment.id) %></span>
-  </nav>
-
-  <header class="page-heading deployment-title">
-    <div>
-      <p class="eyebrow"><%= @deployment.project.name %> / <%= @deployment.environment.name %></p>
-      <h1><%= @deployment.service.name %></h1>
-      <p><%= deployment_source_label(@deployment) %></p>
-    </div>
-    <code class="deployment-id" title="Deployment ID"><%= @deployment.id %></code>
-  </header>
-
-  <section class="metadata-grid" aria-label="Deployment details">
-    <div><span>Environment</span><strong><%= @deployment.environment.name %></strong></div>
-    <div><span>Started by</span><strong><%= deployment_author(@transitions, @actors) %></strong></div>
-    <div><span>Created</span><strong><%= display_timestamp(@deployment.created_at) %></strong></div>
-    <div><span>Duration</span><strong><%= deployment_duration(@deployment, @transitions) %></strong></div>
-    <div><span>Trigger</span><strong><%= @deployment.trigger.humanize %></strong></div>
-    <div><span>Resource size</span><strong><%= deployment_resource_size(@revision) %></strong></div>
-  </section>
+  <%= render "deployments/failure" %>
 
   <%= render "deployments/live" %>
+
+  <%= render "deployments/history" %>
 </main>

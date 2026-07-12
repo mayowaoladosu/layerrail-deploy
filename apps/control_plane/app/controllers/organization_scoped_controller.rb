@@ -10,7 +10,11 @@ class OrganizationScopedController < ApplicationController
   def select_organization!
     return if performed?
 
-    @current_organization = current_principal.organizations.find_by(id: params[:organization_id])
+    @current_organization = if params[:team_slug].present?
+      current_principal.organizations.find_by(slug: params[:team_slug])
+    else
+      current_principal.organizations.find_by(id: params[:organization_id])
+    end
     render_not_found unless @current_organization
   end
 

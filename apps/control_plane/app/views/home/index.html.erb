@@ -1,37 +1,12 @@
 <% content_for :title, "LayerRail Deploy" %>
 
-<%= render "shared/app_header" %>
+<%= render "shared/legacy_header" %>
 
-<main id="main-content" class="app-shell">
-  <section class="welcome-card">
-    <p class="eyebrow">Authenticated session</p>
-    <h1>Welcome, <%= current_principal.name %>.</h1>
-    <p>Review persisted deployment phases, follow live runtime output, promote healthy revisions, and roll back without rebuilding.</p>
-  </section>
-
-  <section aria-labelledby="organizations-heading">
-    <div class="section-heading">
-      <p class="eyebrow">Tenancy</p>
-      <h2 id="organizations-heading">Organizations</h2>
-    </div>
-
-    <div class="organization-grid">
-      <% if @organizations.any? %>
-        <% @organizations.each do |organization| %>
-          <%= link_to organization_deployments_path(organization), class: "organization-card organization-card-link" do %>
-            <span class="organization-avatar" aria-hidden="true"><%= organization.name.first.upcase %></span>
-            <span>
-              <strong><%= organization.name %></strong>
-              <span><%= pluralize(organization.projects.count, "project") %> · View deployments</span>
-            </span>
-          <% end %>
-        <% end %>
-      <% else %>
-        <div class="empty-card">
-          <h3>No organization access yet</h3>
-          <p>An owner can add this identity when invitations ship.</p>
-        </div>
-      <% end %>
+<main id="main-content" class="container max-w-screen-xl mx-auto p-8">
+  <section class="flex items-center justify-center min-h-60 bg-card text-card-foreground border shadow-sm rounded-xl p-4">
+    <div class="max-w-sm text-center">
+      <h1 class="h4">No teams yet.</h1>
+      <p class="text-muted-foreground mt-1">Create or join a team to manage projects and deployments.</p>
     </div>
   </section>
 </main>

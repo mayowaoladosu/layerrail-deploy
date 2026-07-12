@@ -1,36 +1,13 @@
-<section class="surface-card timeline-card" aria-labelledby="timeline-heading">
-  <p class="eyebrow">Persisted phases</p>
-  <h3 id="timeline-heading">Status timeline</h3>
-  <ol class="status-timeline">
-    <% @transitions.each do |transition| %>
-      <li>
-        <span class="timeline-marker status-<%= deployment_status_tone(transition.to_status) %>" aria-hidden="true"></span>
-        <div>
-          <div class="timeline-title">
-            <strong><%= deployment_status_label(transition.to_status) %></strong>
-            <time datetime="<%= transition.occurred_at.utc.iso8601(6) %>"><%= display_timestamp(transition.occurred_at) %></time>
-          </div>
-          <dl class="timeline-metadata">
-            <div>
-              <dt>Change</dt>
-              <dd>
-                <% if transition.from_status %>
-                  <%= deployment_status_label(transition.from_status) %> → <%= deployment_status_label(transition.to_status) %>
-                <% else %>
-                  Deployment record created
-                <% end %>
-              </dd>
-            </div>
-            <div>
-              <dt>Actor</dt>
-              <dd><%= transition_actor(transition, @actors) %></dd>
-            </div>
-          </dl>
-          <% if transition.error.present? %>
-            <p class="timeline-error"><%= transition.error["message"] || "This phase failed." %></p>
-          <% end %>
-        </div>
-      </li>
-    <% end %>
-  </ol>
-</section>
+<ol class="space-y-3">
+  <% @transitions.each do |transition| %>
+    <li class="grid grid-cols-[1rem_1fr_auto] gap-x-3 items-start">
+      <span class="mt-1 [&>svg]:size-4"><%= legacy_icon(transition.to_status.in?(%w[ready promoted]) ? "circle-check" : transition.to_status == "failed" ? "circle-x" : "circle") %></span>
+      <div>
+        <strong><%= deployment_status_label(transition.to_status) %></strong>
+        <div class="text-muted-foreground text-xs"><%= transition_actor(transition, @actors) %></div>
+        <% if transition.error.present? %><p class="text-destructive"><%= transition.error["message"] || "This phase failed." %></p><% end %>
+      </div>
+      <time class="text-muted-foreground text-xs" datetime="<%= transition.occurred_at.utc.iso8601(6) %>"><%= display_timestamp(transition.occurred_at) %></time>
+    </li>
+  <% end %>
+</ol>

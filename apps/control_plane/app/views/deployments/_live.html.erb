@@ -1,123 +1,42 @@
-<% preview_url = "#{ENV.fetch("CONTROL_PLANE_SCHEME", "http")}://#{Routing::Hostnames.immutable(@deployment)}" %>
-<% alias_url = @alias_record && "#{ENV.fetch("CONTROL_PLANE_SCHEME", "http")}://#{Routing::Hostnames.environment(@alias_record)}" %>
-
 <section id="deployment_live"
-  class="live-deployment"
-  aria-labelledby="live-status-heading"
+  class="w-full rounded-lg border group"
   aria-busy="false"
-  data-controller="live-status"
-  data-live-status-url-value="<%= live_organization_deployment_path(current_organization, @deployment, format: :turbo_stream) %>"
+  data-controller="live-status<%= " log-filter" if @log_feed.entries.any? %>"
+  data-live-status-url-value="<%= live_project_deployment_path(current_organization.slug, @project.slug, @deployment, format: :turbo_stream) %>"
   data-live-status-version-value="<%= @live_version %>"
-  data-live-status-active-value="<%= !@deployment.terminal? %>">
-  <div class="live-error" role="status" data-live-status-target="error" hidden>
-    Live updates paused. The saved deployment state is still shown; reconnecting automatically.
-  </div>
-
-  <header class="status-hero">
-    <div>
-      <p class="eyebrow">Persisted status</p>
-      <span class="live-refresh-label" aria-hidden="true">Checking for updates…</span>
-      <h2 id="live-status-heading">
-        <span class="status-pulse status-<%= deployment_status_tone(@deployment.status) %>" aria-hidden="true"></span>
-        <span role="status" aria-live="polite"><%= deployment_status_label(@deployment.status) %></span>
-      </h2>
-      <p>
-        <% if @deployment.terminal? %>
-          This outcome is saved. Refreshing or closing the page will not change it.
-        <% elsif @deployment.status.in?(%w[ready promoted superseded]) %>
-          This release state is saved. Runtime output continues to update while the revision is active.
-        <% else %>
-          Progress is saved in the control plane. This page updates while work continues.
-        <% end %>
-      </p>
-    </div>
-    <%= render "deployments/actions" %>
+  data-live-status-active-value="<%= !@deployment.terminal? %>"
+  data-log-filter-storage-key-value="deployment-log-filter:<%= @deployment.id %>">
+  <div class="alert-destructive m-4" role="status" data-live-status-target="error" hidden>Live updates paused. Persisted deployment state remains available.</div>
+  <header class="px-4 h-10 w-full flex items-center gap-x-2">
+    Logs
+    <span class="text-muted-foreground text-xs ml-auto">
+      <% if @provider_logs.status == :ok && @provider_logs.retained %>Retained runtime logs<% elsif @provider_logs.status == :ok %>Runtime connected<% else %>Persisted events only<% end %>
+    </span>
+    <%= link_to legacy_icon("logs"), project_deployment_logs_path(current_organization.slug, @project.slug, @deployment), class: "btn-sm-icon-ghost", data: { tooltip: "Download logs", turbo: false }, aria: { label: "Download logs" } %>
   </header>
 
-  <% if @failure_transition %>
-    <% error = @failure_transition.error %>
-    <section class="failure-panel" aria-labelledby="failure-heading">
-      <p class="eyebrow">Structured failure</p>
-      <h3 id="failure-heading"><%= error["message"] || "The deployment could not complete." %></h3>
-      <p>This deployment did not reach a healthy revision. Correct the source or runtime issue, then redeploy.</p>
-      <dl>
-        <% if error["phase"] %><div><dt>Phase</dt><dd><%= error["phase"].humanize %></dd></div><% end %>
-        <% if error["code"] %><div><dt>Code</dt><dd><code><%= error["code"] %></code></dd></div><% end %>
-        <% if error["diagnostic_reference"] %><div><dt>Support reference</dt><dd><code><%= error["diagnostic_reference"] %></code></dd></div><% end %>
-      </dl>
-    </section>
+  <% if @log_feed.entries.any? %>
+    <div class="form grid sm:grid-cols-[1fr_12rem] gap-3 border-t p-3" role="search" aria-label="Filter deployment logs">
+      <label class="grid gap-1"><span class="text-xs text-muted-foreground">Search logs</span><input type="search" placeholder="Filter visible messages" autocomplete="off" data-log-filter-target="query" data-action="input->log-filter#filter"></label>
+      <label class="grid gap-1"><span class="text-xs text-muted-foreground">Stream</span><select data-log-filter-target="stream" data-action="change->log-filter#filter"><option value="all">All streams</option><option value="build">Build</option><option value="runtime">Runtime</option><option value="system">System</option></select></label>
+    </div>
   <% end %>
 
-  <div class="detail-columns">
-    <section class="surface-card" aria-labelledby="urls-heading">
-      <p class="eyebrow">Routing</p>
-      <h3 id="urls-heading">Generated URLs</h3>
-      <div class="url-list">
-        <div>
-          <span>Immutable deployment</span>
-          <% if @revision && !@deployment.terminal? %>
-            <%= link_to preview_url, preview_url, target: "_blank", rel: "noopener", class: "url-link" %>
-          <% else %>
-            <code class="url-link"><%= preview_url %></code>
-            <small><%= @deployment.terminal? ? "No longer routed" : "Available after a candidate starts" %></small>
-          <% end %>
-        </div>
-        <% if alias_url %>
-          <div>
-            <span><%= @deployment.environment.name %> environment</span>
-            <%= link_to alias_url, alias_url, target: "_blank", rel: "noopener", class: "url-link" %>
-            <small><%= @serving ? "Points to this revision" : "Points to another ready revision" %></small>
-          </div>
-        <% else %>
-          <div class="partial-state">
-            <span>Environment URL</span>
-            <p>No revision has been promoted to this environment yet.</p>
-          </div>
-        <% end %>
-      </div>
-    </section>
+  <% if @provider_logs.status == :unavailable %>
+    <div class="alert m-3" role="status"><%= legacy_icon("triangle-alert") %><section>Runtime output is temporarily unavailable. Persisted build and status events remain complete, and live updates will retry.</section></div>
+  <% elsif @provider_logs.status == :not_found && @deployment.terminal? %>
+    <div class="text-muted-foreground px-4 py-2 border-t" role="status">The runtime is no longer active. Persisted build and status events remain available.</div>
+  <% elsif @provider_logs.retained %>
+    <div class="text-muted-foreground px-4 py-2 border-t" role="status">The runtime has stopped. Its latest redacted output is retained with the persisted deployment events below.</div>
+  <% end %>
+  <% if @log_feed.truncated %><p class="text-muted-foreground px-4 py-2 border-t">Showing the latest 200 runtime lines plus persisted deployment events.</p><% end %>
 
-    <section class="surface-card" aria-labelledby="alias-heading">
-      <p class="eyebrow">Release pointer</p>
-      <h3 id="alias-heading">Current and previous</h3>
-      <% if @alias_record %>
-        <dl class="alias-list">
-          <div>
-            <dt>Current</dt>
-            <dd>
-              <%= link_to short_public_id(@alias_record.current_revision_id),
-                organization_deployment_path(current_organization, @alias_record.current_revision.deployment_id) %>
-              <span class="status-badge status-success">Ready</span>
-            </dd>
-          </div>
-          <div>
-            <dt>Previous</dt>
-            <dd>
-              <% if @alias_record.previous_revision %>
-                <% previous_deployment = @alias_record.previous_revision.deployment %>
-                <%= link_to short_public_id(@alias_record.previous_revision_id),
-                  organization_deployment_path(current_organization, previous_deployment) %>
-                <% if previous_deployment.status.in?(Aliases::Promote::PROMOTABLE_DEPLOYMENT_STATUSES) %>
-                  <span class="status-badge status-muted">Rollback available</span>
-                <% else %>
-                  <span class="status-badge status-muted"><%= deployment_status_label(previous_deployment.status) %> · history only</span>
-                <% end %>
-              <% else %>
-                <span>None yet</span>
-              <% end %>
-            </dd>
-          </div>
-        </dl>
-      <% else %>
-        <div class="partial-state">
-          <p>No environment release exists yet. Promote this deployment after it reaches Ready.</p>
-        </div>
-      <% end %>
-    </section>
-  </div>
-
-  <div class="detail-columns detail-columns-wide">
-    <%= render "deployments/logs" %>
-    <%= render "deployments/timeline" %>
+  <div id="deployment-logs" class="overflow-y-auto h-[500px] relative p-2 border-t scrollbar-thin scrollbar">
+    <% if @log_feed.entries.any? %>
+      <ol class="font-mono text-[13px] leading-5" role="log" aria-live="off" aria-label="Deployment log entries"><% @log_feed.entries.each do |entry| %><li class="grid grid-cols-[5rem_4rem_1fr] gap-x-2 hover:bg-muted/50 px-2 py-0.5" data-log-filter-target="entry" data-stream="<%= entry.stream %>" data-message="<%= entry.message.downcase %>"><time class="text-muted-foreground" datetime="<%= entry.timestamp.utc.iso8601(6) %>"><%= entry.timestamp.utc.strftime("%H:%M:%S") %></time><span class="text-muted-foreground uppercase text-xs"><%= entry.stream %></span><code class="whitespace-pre-wrap break-all"><%= entry.message %></code></li><% end %></ol>
+      <p class="absolute inset-0 items-center justify-center text-muted-foreground" data-log-filter-target="empty" hidden>No visible log entries match this filter.</p>
+    <% else %>
+      <div class="absolute inset-0 flex items-center justify-center text-muted-foreground"><div class="flex items-center gap-x-2 [&>svg]:size-4"><%= legacy_icon(@deployment.terminal? ? "ban" : "loader") %><%= @deployment.terminal? ? "No logs found" : "Waiting for logs" %></div></div>
+    <% end %>
   </div>
 </section>

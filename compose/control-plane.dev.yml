@@ -21,6 +21,7 @@ services:
       BUNDLE_USER_HOME: /tmp/bundle-user
       HOME: /tmp/home
       LRAIL_CONTRACTS_DIR: /contracts
+      LEGACY_UI_ROOT: /legacy-ui
       RAILS_ENV: development
       RAILS_LOG_TO_STDOUT: "true"
       XDG_CACHE_HOME: /tmp/cache
@@ -37,6 +38,8 @@ services:
     volumes:
       - ${APP_DIR:-..}/apps/control_plane:/rails
       - ${APP_DIR:-..}/contracts:/contracts:ro
+      - ${APP_DIR:-..}/app/assets:/legacy-ui/assets:ro
+      - ${APP_DIR:-..}/app/templates/icons:/legacy-ui/templates/icons:ro
       - local-provider-auth:/run/lrail-provider-auth:ro
       - orchestrator-auth:/run/lrail-orchestrator-auth:ro
       - control-plane-log:/rails/log

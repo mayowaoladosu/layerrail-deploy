@@ -1,38 +1,44 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Language" content="en">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><%= content_for(:title) || "LayerRail Deploy" %></title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="LayerRail Deploy">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="Deploy applications and manage environments with LayerRail Deploy.">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-
-    <%= yield :head %>
-
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
-    <link rel="icon" href="/icon.png" type="image/png">
-    <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
-
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
-    <%= stylesheet_link_tag :application, "data-turbo-track": "reload" %>
+    <%= stylesheet_link_tag legacy_asset_path("styles.css"), data: { turbo_track: "reload" } %>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("themeMode")
+          if (stored ? stored === "dark" : matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.classList.add("dark")
+          }
+        } catch (_) {}
+        const apply = dark => {
+          document.documentElement.classList.toggle("dark", dark)
+          try { localStorage.setItem("themeMode", dark ? "dark" : "light") } catch (_) {}
+        }
+        document.addEventListener("basecoat:theme", event => {
+          const mode = event.detail?.mode
+          apply(mode === "dark" ? true : mode === "light" ? false : !document.documentElement.classList.contains("dark"))
+        })
+      })()
+    </script>
+    <link rel="icon" type="image/svg+xml" href="<%= legacy_asset_path("favicon.svg") %>">
+    <link rel="apple-touch-icon" sizes="180x180" href="<%= legacy_asset_path("apple-touch-icon.png") %>">
+    <script src="<%= legacy_asset_path("basecoat.min.js") %>" defer></script>
+    <script src="<%= legacy_asset_path("alpine.min.js") %>" defer></script>
+    <script src="<%= legacy_asset_path("htmx.min.js") %>" defer></script>
+    <script src="<%= legacy_asset_path("htmx-sse.min.js") %>" defer></script>
     <%= javascript_importmap_tags %>
+    <%= yield :head %>
   </head>
-
-  <body>
-    <a class="skip-link" href="#main-content">Skip to main content</a>
-    <% flash.each do |type, message| %>
-      <div class="flash-message flash-message-<%= type %>"
-        role="<%= type.to_s == "alert" ? "alert" : "status" %>"
-        tabindex="-1"
-        data-controller="focus">
-        <%= message %>
-      </div>
-    <% end %>
+  <body class="relative h-full text-sm min-h-screen">
+    <a class="sr-only focus:not-sr-only" href="#main-content">Skip to main content</a>
     <%= yield %>
+    <%= render "shared/flash_toasts" %>
   </body>
 </html>

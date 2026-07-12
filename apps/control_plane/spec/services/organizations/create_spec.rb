@@ -7,6 +7,7 @@ RSpec.describe Organizations::Create do
     result = described_class.call(principal: principal, name: "Acme")
 
     expect(result.organization).to be_persisted
+    expect(result.organization.slug).to eq("acme")
     expect(result.organization.id).to match(/\A[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/)
     expect(result.membership).to have_attributes(
       user: principal,
@@ -14,6 +15,20 @@ RSpec.describe Organizations::Create do
       role: "owner"
     )
     expect(principal.reload.email).to eq("owner@example.com")
+  end
+
+  it "creates bounded unique slugs for duplicate team names" do
+    first_owner = User.create!(email: "first-slug@example.com", name: "First")
+    second_owner = User.create!(email: "second-slug@example.com", name: "Second")
+    long_name = "A team name that is intentionally much longer than the route slug limit and still works"
+
+    first = described_class.call(principal: first_owner, name: long_name).organization
+    second = described_class.call(principal: second_owner, name: long_name).organization
+
+    expect(first.slug.length).to be <= 64
+    expect(second.slug.length).to be <= 64
+    expect(second.slug).not_to eq(first.slug)
+    expect(second.slug).to match(/-[0-9a-f]{8}\z/)
   end
 
   it "rolls back tenant state when the organization is invalid" do

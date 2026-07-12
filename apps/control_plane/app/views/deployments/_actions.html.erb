@@ -1,42 +1,32 @@
-<div class="deployment-actions" aria-label="Deployment actions">
-  <% if @can_promote %>
-    <%= button_to "Promote to #{@deployment.environment.name}",
-      promote_organization_deployment_path(current_organization, @deployment),
-      method: :post,
-      class: "button button-primary",
-      form: { data: { turbo_confirm: "Move the #{@deployment.environment.name} URL to this ready revision? The current revision will remain available for rollback." } } %>
+<% if @can_rollback %>
+  <%= button_to rollback_project_deployment_path(current_organization.slug, @project.slug, @deployment),
+    method: :post,
+    params: { revision_id: @alias_record.previous_revision_id, expected_lock_version: @alias_record.lock_version },
+    role: "menuitem",
+    form: { data: { turbo_confirm: "Rollback to the previous healthy revision without rebuilding?" } } do %>
+    <%= legacy_icon("undo-2") %>Instant rollback
   <% end %>
+<% end %>
 
-  <% if @can_rollback %>
-    <%= button_to "Roll back",
-      rollback_organization_deployment_path(current_organization, @deployment),
-      method: :post,
-      params: {
-        revision_id: @alias_record.previous_revision_id,
-        expected_lock_version: @alias_record.lock_version
-      },
-      class: "button button-secondary",
-      form: { data: { turbo_confirm: "Return the #{@deployment.environment.name} URL to revision #{short_public_id(@alias_record.previous_revision_id)}? No build will run." } } %>
+<% if @can_promote %>
+  <%= button_to promote_project_deployment_path(current_organization.slug, @project.slug, @deployment),
+    method: :post,
+    role: "menuitem",
+    form: { data: { turbo_confirm: "Move this environment URL to the ready revision?" } } do %>
+    <%= legacy_icon("chevrons-up") %>Promote
   <% end %>
+<% end %>
 
-  <% if @can_redeploy %>
-    <%= button_to "Redeploy",
-      redeploy_organization_deployment_path(current_organization, @deployment),
-      method: :post,
-      params: { operation_id: SecureRandom.uuid_v7 },
-      class: "button button-secondary",
-      form: { data: { turbo_confirm: "Create a new deployment from the same immutable source and the environment's current resolved configuration?" } } %>
+<% if @can_redeploy %>
+  <%= button_to redeploy_project_deployment_path(current_organization.slug, @project.slug, @deployment),
+    method: :post,
+    params: { operation_id: SecureRandom.uuid_v7 },
+    role: "menuitem",
+    form: { data: { turbo_confirm: "Redeploy this immutable source with the latest configuration?" } } do %>
+    <%= legacy_icon("redo-2") %>Redeploy
   <% end %>
+<% end %>
 
-  <% if @can_cancel %>
-    <%= button_to "Cancel deployment",
-      cancel_organization_deployment_path(current_organization, @deployment),
-      method: :post,
-      class: "button button-danger",
-      form: { data: { turbo_confirm: "Stop and remove this non-serving runtime? Its deployment history will remain available." } } %>
-  <% end %>
-
-  <% unless @can_manage %>
-    <p class="action-note">Members can inspect this deployment. An owner or administrator can change it.</p>
-  <% end %>
-</div>
+<% unless @can_manage %>
+  <span role="menuitem" class="text-muted-foreground">Members can inspect this deployment.</span>
+<% end %>

@@ -1,0 +1,107 @@
+<% header_project = @project || @deployment&.project %>
+<header class="sticky top-0 bg-background z-20 border-b px-8 flex flex-col gap-y-2">
+  <div class="flex items-center justify-between gap-x-4 h-16">
+    <nav class="flex items-center gap-x-1.5 sm:gap-x-2.5" aria-label="Application">
+      <%= link_to root_path, class: "w-6 h-8 shrink-0 flex items-center justify-center [&>svg]:size-6", aria: { label: "LayerRail Deploy" } do %>
+        <svg width="120" height="120" viewBox="0 0 120 120" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M39.9265 17L16.5652 103.791H0L23.3612 17H39.9265Z"/><path d="M81.7018 98.5804L71.6494 88.5988L92.6037 67.6445H47.1555V52.9198H92.6037L71.6494 31.9655L81.7018 21.9839L120 60.2822L81.7018 98.5804Z"/></svg>
+      <% end %>
+
+      <% if current_principal && current_organization %>
+        <span class="text-muted-foreground/25 text-xl">/</span>
+        <div class="flex items-center">
+          <%= link_to team_path(current_organization.slug), class: "btn-sm-ghost pl-2" do %>
+            <%= legacy_avatar(current_organization, size: :xs) %>
+            <span class="<%= "max-sm:hidden" if header_project || @deployment %>"><%= current_organization.name %></span>
+          <% end %>
+          <div class="dropdown-menu">
+            <button type="button" class="btn-sm-ghost text-muted-foreground w-6" aria-haspopup="menu" aria-controls="team-switcher-menu"><%= legacy_icon("chevrons-up-down") %></button>
+            <div data-popover aria-hidden="true" data-align="start"><div id="team-switcher-menu" role="menu">
+              <span role="menuitem" class="flex items-center gap-x-1"><%= legacy_avatar(current_organization, size: :xs) %><%= current_organization.name %><span class="size-4 ml-auto text-muted-foreground"><%= legacy_icon("check") %></span></span>
+              <% Array(@latest_teams).each do |team| %>
+                <%= link_to team_path(team.slug), role: "menuitem" do %><%= legacy_avatar(team, size: :xs) %><%= team.name %><span class="size-4 ml-auto"></span><% end %>
+              <% end %>
+            </div></div>
+          </div>
+        </div>
+      <% end %>
+
+      <% if header_project %>
+        <span class="text-muted-foreground/25 text-xl">/</span>
+        <div class="flex items-center">
+          <%= link_to project_path(current_organization.slug, header_project.slug), class: "btn-sm-ghost pl-2" do %>
+            <%= legacy_avatar(header_project, size: :xs) %>
+            <span class="<%= "max-sm:hidden" if @deployment %>"><%= header_project.name %></span>
+          <% end %>
+          <div class="dropdown-menu">
+            <button type="button" class="btn-sm-ghost text-muted-foreground w-6" aria-haspopup="menu" aria-controls="project-switcher-menu"><%= legacy_icon("chevrons-up-down") %></button>
+            <div data-popover aria-hidden="true" data-align="start"><div id="project-switcher-menu" role="menu">
+              <span role="menuitem" class="flex items-center gap-x-1"><%= legacy_avatar(header_project, size: :xs) %><%= header_project.name %><span class="size-4 ml-auto text-muted-foreground"><%= legacy_icon("check") %></span></span>
+              <% Array(@latest_projects).each do |project| %>
+                <%= link_to project_path(current_organization.slug, project.slug), role: "menuitem" do %><%= legacy_avatar(project, size: :xs) %><%= project.name %><span class="size-4 ml-auto"></span><% end %>
+              <% end %>
+            </div></div>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @deployment %>
+        <span class="text-muted-foreground/25 text-xl">/</span>
+        <div class="flex items-center">
+          <%= link_to legacy_deployment_path(@deployment), class: "btn-sm-ghost" do %><%= legacy_status(@deployment, compact: true) %><span class="font-mono text-[13px]"><%= @deployment.id.first(7) %></span><% end %>
+          <div class="dropdown-menu">
+            <button type="button" class="btn-sm-ghost text-muted-foreground w-6" aria-haspopup="menu" aria-controls="deployment-switcher-menu"><%= legacy_icon("chevrons-up-down") %></button>
+            <div data-popover aria-hidden="true" data-align="start"><div id="deployment-switcher-menu" role="menu">
+              <span role="menuitem" class="flex items-center gap-x-2"><%= legacy_status(@deployment, compact: true) %><span class="font-mono text-[13px]"><%= @deployment.id.first(7) %></span><span class="size-4 ml-auto text-muted-foreground"><%= legacy_icon("check") %></span></span>
+              <% Array(@latest_deployments).each do |deployment| %>
+                <%= link_to legacy_deployment_path(deployment), role: "menuitem", class: "text-[13px] font-mono" do %><%= legacy_status(deployment, compact: true) %><%= deployment.id.first(7) %><span class="size-4 ml-auto"></span><% end %>
+              <% end %>
+              <hr role="separator">
+              <%= link_to "All deployments", project_deployments_path(current_organization.slug, header_project.slug), role: "menuitem" %>
+            </div></div>
+          </div>
+        </div>
+      <% end %>
+    </nav>
+
+    <nav class="flex items-center gap-x-2" aria-label="User menu">
+      <% if current_principal %>
+        <div class="dropdown-menu max-sm:hidden">
+          <button type="button" class="btn-sm-icon-ghost" aria-label="Help" aria-haspopup="menu" aria-controls="help-menu"><%= legacy_icon("circle-question-mark") %></button>
+          <div data-popover aria-hidden="true" data-align="end"><div id="help-menu" role="menu">
+            <%= link_to "https://docs.layerrail.com", target: "_blank", rel: "noopener", role: "menuitem" do %>Documentation<span class="ml-auto text-muted-foreground [&>svg]:size-3"><%= legacy_icon("external-link") %></span><% end %>
+            <%= link_to "https://discord.gg/JbYPEDjUHX", target: "_blank", rel: "noopener", role: "menuitem" do %>Chat<span class="ml-auto text-muted-foreground [&>svg]:size-3"><%= legacy_icon("external-link") %></span><% end %>
+          </div></div>
+        </div>
+
+        <div class="dropdown-menu">
+          <button type="button" class="btn-icon-sm-ghost rounded-full shrink-0 p-0 border-0" aria-haspopup="menu" aria-controls="user-menu"><%= legacy_avatar(current_principal, round: true) %></button>
+          <div data-popover aria-hidden="true" data-align="end"><div id="user-menu" role="menu">
+            <header class="px-2.5 py-1.5"><div class="font-medium"><%= current_principal.name %></div><div class="text-muted-foreground"><%= current_principal.email %></div></header>
+            <hr role="separator">
+            <%= link_to "Default team", root_path, role: "menuitem" %>
+            <hr role="separator">
+            <button type="button" role="menuitem" onclick="document.dispatchEvent(new CustomEvent('basecoat:theme'))"><span class="hidden dark:block">Theme: Light</span><span class="block dark:hidden">Theme: Dark</span><span class="hidden dark:block ml-auto text-muted-foreground"><%= legacy_icon("sun") %></span><span class="block dark:hidden ml-auto text-muted-foreground"><%= legacy_icon("moon") %></span></button>
+            <hr role="separator">
+            <%= button_to "Sign out", rodauth.logout_path, method: :post, role: "menuitem" %>
+          </div></div>
+        </div>
+      <% end %>
+    </nav>
+  </div>
+
+  <% tabs = if header_project
+    [["Overview", project_path(current_organization.slug, header_project.slug)], ["Deployments", project_deployments_path(current_organization.slug, header_project.slug)]]
+  elsif current_organization
+    [["Overview", team_path(current_organization.slug)], ["Projects", team_projects_path(current_organization.slug)]]
+  else
+    []
+  end %>
+  <% if tabs.any? %>
+    <nav aria-label="Secondary navigation" class="-mt-2 -mb-[1px]"><ul role="tablist" class="flex items-center gap-x-1">
+      <% tabs.each do |label, url| %>
+        <% selected = request.path == url || (label == "Deployments" && request.path.start_with?(url)) %>
+        <li role="presentation" class="pb-1.5 border-b-2 <%= selected ? "border-primary" : "border-transparent" %>"><%= link_to label, url, role: "tab", aria: { selected: selected }, class: "btn-sm-ghost text-muted-foreground hover:text-foreground #{"text-foreground" if selected}" %></li>
+      <% end %>
+    </ul></nav>
+  <% end %>
+</header>

@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+  get "legacy-assets/*filename" => "legacy_assets#show", as: :legacy_asset, format: false
   root "home#index"
   get "health" => "health#show", as: :health
   get "health/orchestrator" => "health#orchestrator"
@@ -61,4 +62,16 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   # root "posts#index"
+
+  get ":team_slug/projects/:project_name/deployments/:id/live" => "deployments#live", as: :live_project_deployment
+  get ":team_slug/projects/:project_name/deployments/:id/logs" => "deployments#download_logs", as: :project_deployment_logs
+  post ":team_slug/projects/:project_name/deployments/:id/cancel" => "deployment_actions#cancel", as: :cancel_project_deployment
+  post ":team_slug/projects/:project_name/deployments/:id/redeploy" => "deployment_actions#redeploy", as: :redeploy_project_deployment
+  post ":team_slug/projects/:project_name/deployments/:id/promote" => "deployment_actions#promote", as: :promote_project_deployment
+  post ":team_slug/projects/:project_name/deployments/:id/rollback" => "deployment_actions#rollback", as: :rollback_project_deployment
+  get ":team_slug/projects/:project_name/deployments/:id" => "deployments#show", as: :project_deployment
+  get ":team_slug/projects/:project_name/deployments" => "deployments#index", as: :project_deployments
+  get ":team_slug/projects/:project_name" => "projects#show", as: :project
+  get ":team_slug/projects" => "teams#projects", as: :team_projects
+  get ":team_slug" => "teams#show", as: :team
 end

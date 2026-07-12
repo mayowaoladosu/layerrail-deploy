@@ -33,7 +33,7 @@ class DeploymentActionsController < OrganizationScopedController
       correlation_id: SecureRandom.uuid_v7,
       trigger: :redeploy
     )
-    redirect_to organization_deployment_path(current_organization, result.deployment),
+    redirect_to deployment_path(result.deployment),
       notice: "Redeploy accepted. Progress is saved and will continue if this page is closed.",
       status: :see_other
   rescue Deployments::Create::IdempotencyConflict
@@ -97,12 +97,21 @@ class DeploymentActionsController < OrganizationScopedController
   private
 
   def load_deployment
-    @deployment = policy_scope(Deployment).find(params[:id])
+    scope = policy_scope(Deployment)
+    if params[:project_name].present?
+      project = current_organization.projects.find_by!(slug: params[:project_name])
+      scope = scope.where(project:)
+    end
+    @deployment = scope.find(params[:id])
     authorize @deployment, :transition?
   end
 
-  def deployment_path
-    organization_deployment_path(current_organization, @deployment)
+  def deployment_path(deployment = @deployment)
+    if params[:team_slug].present?
+      project_deployment_path(current_organization.slug, deployment.project.slug, deployment)
+    else
+      organization_deployment_path(current_organization, deployment)
+    end
   end
 
   def redirect_with_alert(message)

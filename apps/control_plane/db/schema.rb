@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_12_202000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_12_203000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -353,8 +353,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_202000) do
   create_table "organizations", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", limit: 120, null: false
+    t.string "slug", limit: 64, null: false
     t.datetime "updated_at", null: false
+    t.index ["slug"], name: "index_organizations_on_slug", unique: true
     t.check_constraint "btrim(name::text) <> ''::text", name: "organizations_name_present"
+    t.check_constraint "slug::text ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text", name: "organizations_slug_format"
   end
 
   create_table "outbox_events", id: :uuid, default: nil, force: :cascade do |t|

@@ -1,10 +1,9 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
+    <meta charset="utf-8">
     <title><%= content_for(:title) || [ @page_title, "LayerRail Deploy" ].compact.join(" · ") %></title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="application-name" content="LayerRail Deploy">
-    <meta name="color-scheme" content="light dark">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
@@ -19,27 +18,19 @@
       })()
     </script>
 
-    <link rel="icon" href="/icon.png" type="image/png">
-    <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
-
-    <%= stylesheet_link_tag :application, "data-turbo-track": "reload" %>
+    <link rel="icon" type="image/svg+xml" href="<%= legacy_asset_path("favicon.svg") %>">
+    <%= stylesheet_link_tag legacy_asset_path("styles.css"), data: { turbo_track: "reload" } %>
+    <script src="<%= legacy_asset_path("basecoat.min.js") %>" defer></script>
+    <script src="<%= legacy_asset_path("alpine.min.js") %>" defer></script>
+    <script src="<%= legacy_asset_path("htmx.min.js") %>" defer></script>
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="auth-page">
-    <a class="skip-link" href="#main-content">Skip to main content</a>
-    <%= render "shared/auth_header" %>
-
-    <% flash.each do |type, message| %>
-      <div class="flash-message flash-message-<%= type %>"
-        role="<%= type.to_s.in?([ "alert", "error" ]) ? "alert" : "status" %>"
-        tabindex="-1"
-        data-controller="focus">
-        <%= message %>
-      </div>
-    <% end %>
+  <body class="relative h-full text-sm min-h-screen">
+    <a class="sr-only focus:not-sr-only" href="#main-content">Skip to main content</a>
+    <%= render "shared/legacy_header" %>
 
     <%= yield %>
+    <%= render "shared/flash_toasts" %>
   </body>
 </html>

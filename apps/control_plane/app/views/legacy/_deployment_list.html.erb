@@ -1,0 +1,66 @@
+<% if deployments.any? %>
+  <ul>
+    <% deployments.each do |deployment| %>
+      <% alias_record = Alias.find_by(service: deployment.service, environment: deployment.environment, alias_type: :environment) %>
+      <li class="flex gap-x-4 items-center border border-border/100 border-b-0 last:border-b first:rounded-t-xl last:rounded-b-xl px-4 h-12 text-sm hover:bg-muted/50 transition-colors bg-clip-padding">
+        <%= legacy_status(deployment, compact: true) %>
+
+        <%= link_to legacy_deployment_path(deployment), data: { tooltip: "Deployment ID" } do %>
+          <span class="font-medium font-mono text-[13px]"><%= deployment.id.first(7) %></span>
+        <% end %>
+
+        <% if local_assigns[:display_project] %>
+          <%= link_to project_path(deployment.organization.slug, deployment.project.slug),
+            class: "flex items-center gap-x-2 text-muted-foreground hover:text-foreground transition-colors min-w-0",
+            data: { tooltip: "Project" } do %>
+            <%= legacy_avatar(deployment.project, size: :xs) %>
+            <span class="truncate max-sm:hidden"><%= deployment.project.name %></span>
+          <% end %>
+        <% end %>
+
+        <%= link_to legacy_deployments_path(deployment.project, environment: deployment.environment.slug),
+          class: "flex items-center gap-x-2 hover:text-foreground transition-colors text-muted-foreground max-sm:truncate",
+          data: { tooltip: "Environment" } do %>
+          <span class="w-4 h-4 flex items-center justify-center">
+            <span class="inline-block rounded h-2.5 w-2.5 bg-<%= legacy_environment_color(deployment.environment) %>-500 shrink-0"></span>
+          </span>
+          <span class="truncate"><%= deployment.environment.name %></span>
+        <% end %>
+
+        <div class="flex items-center gap-x-2 text-muted-foreground whitespace-nowrap max-sm:hidden">
+          <%= time_ago_in_words(deployment.created_at) %> ago
+        </div>
+
+        <% if deployment.source_snapshot["type"] == "git" %>
+          <span class="flex items-center gap-x-2 text-muted-foreground min-w-0 max-sm:hidden max-lg:hidden" data-tooltip="Branch">
+            <%= legacy_icon("git-branch") %>
+            <span class="truncate"><%= deployment.source_snapshot["reference"] %></span>
+          </span>
+          <span class="flex items-center gap-x-2 text-muted-foreground min-w-0 max-sm:hidden max-w-1/2" data-tooltip="Commit">
+            <%= legacy_icon("git-commit-horizontal") %>
+            <span class="truncate font-mono"><%= deployment.source_snapshot["commit_sha"].to_s.first(7) %></span>
+          </span>
+        <% end %>
+
+        <% if alias_record&.current_revision&.deployment_id == deployment.id %>
+          <span class="badge-secondary max-sm:hidden"><%= legacy_icon("sparkle") %>Current</span>
+        <% elsif alias_record&.previous_revision&.deployment_id == deployment.id %>
+          <span class="badge-secondary text-muted-foreground max-sm:hidden">Previous</span>
+        <% end %>
+
+        <div class="flex items-center ml-auto">
+          <%= link_to legacy_deployment_path(deployment), class: "btn-sm-icon-ghost", data: { tooltip: "Open" } do %>
+            <%= legacy_icon("chevron-right") %>
+          <% end %>
+        </div>
+      </li>
+    <% end %>
+  </ul>
+<% elsif local_assigns[:display_empty] %>
+  <section class="flex items-center justify-center min-h-60 bg-card text-card-foreground border shadow-sm rounded-xl p-4">
+    <div class="max-w-sm text-center">
+      <h2 class="h4">No deployments yet.</h2>
+      <p class="text-muted-foreground mt-1">Push code to your repository or trigger a deployment.</p>
+    </div>
+  </section>
+<% end %>

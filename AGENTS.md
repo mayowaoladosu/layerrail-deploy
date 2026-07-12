@@ -183,6 +183,9 @@ These guidelines apply to every script under `scripts/` (install/start/stop/rest
 8. Keep runtime processes non-root. Writable development state belongs on the dedicated log, storage and tmp volumes, not in the source mount.
 9. Git provider adapters return provider-neutral `GitProviders::Result` values and pass the shared provider contract. Do not expose raw provider hashes or exceptions.
 10. Bind repository operations to an installation session. Never serialize, inspect or log clone secrets, user tokens, webhook secrets or raw credential-bearing URLs.
+11. The existing Devpush dashboard under `app/templates` and `app/assets` is the Rails presentation contract. Port pages to ERB without redesigning their hierarchy, navigation, component vocabulary, spacing or workflows.
+12. New Rails behavior must appear through the legacy dashboard's Basecoat components and original compiled assets. Do not add a parallel control-plane dashboard, separate SPA, Rails-only visual system or replacement stylesheet without an explicit superseding ADR.
+13. Turbo and Stimulus may replace HTMX/Alpine behavior internally when the rendered interface and workflow remain equivalent. Keep visual-contract request specs separate from behavior/security specs so presentation changes cannot weaken backend acceptance criteria.
 
 ---
 

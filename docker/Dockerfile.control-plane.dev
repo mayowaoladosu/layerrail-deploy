@@ -25,11 +25,16 @@ WORKDIR /rails
 COPY apps/control_plane/Gemfile apps/control_plane/Gemfile.lock ./
 RUN bundle install
 
+# The original Devpush UI is the presentation contract for the Ruby control plane.
+COPY app/assets /legacy-ui/assets
+COPY app/templates/icons /legacy-ui/templates/icons
+
 # Prepare writable runtime directories
 RUN mkdir -p log storage tmp/pids tmp/storage \
     && chown -R "${APP_UID}:${APP_GID}" /rails
 
 ENV HOME=/rails
+ENV LEGACY_UI_ROOT=/legacy-ui
 
 USER appuser
 

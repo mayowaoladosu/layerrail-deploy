@@ -1,0 +1,45 @@
+<% content_for :title, "#{@team.name} · LayerRail Deploy" %>
+<%= render "shared/legacy_header" %>
+
+<main id="main-content" class="container max-w-screen-xl mx-auto p-8 space-y-6">
+  <h1 class="h1 flex items-center gap-x-3">
+    <%= legacy_avatar(@team, size: :md) %>
+    <%= @team.name %>
+  </h1>
+
+  <% if @projects.any? %>
+    <section class="space-y-4">
+      <header class="flex justify-between items-center gap-x-4">
+        <h2 class="h4">Recent projects</h2>
+      </header>
+      <ul class="max-sm:flex max-sm:overflow-x-auto scrollbar max-sm:[&>li]:max-w-3xs max-sm:[&>li]:w-full sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <% @projects.each do |project| %>
+          <li class="bg-card text-card-foreground rounded-xl border shadow-sm p-4 space-y-4">
+            <%= link_to project_path(@team.slug, project.slug), class: "flex items-center gap-x-2 font-medium min-w-0" do %>
+              <%= legacy_avatar(project, size: :sm) %>
+              <span class="truncate"><%= project.name %></span>
+            <% end %>
+            <ul class="space-y-1 text-muted-foreground">
+              <li class="flex items-center gap-x-2"><%= legacy_icon("square-stack") %><%= pluralize(project.services.size, "service") %></li>
+              <li class="flex items-center gap-x-2"><%= legacy_icon("layers") %><%= pluralize(project.environments.size, "environment") %></li>
+            </ul>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% else %>
+    <section class="flex items-center justify-center min-h-60 bg-card text-card-foreground border shadow-sm rounded-xl p-4">
+      <div class="max-w-sm text-center">
+        <h2 class="h4">Deploy your first project.</h2>
+        <p class="text-muted-foreground mt-1">Add a project from an existing Git repository.</p>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @deployments.any? %>
+    <section class="space-y-4">
+      <h2 class="h4">Latest deployments</h2>
+      <%= render "legacy/deployment_list", deployments: @deployments, display_project: true %>
+    </section>
+  <% end %>
+</main>

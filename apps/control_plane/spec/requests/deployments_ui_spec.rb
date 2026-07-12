@@ -72,22 +72,26 @@ RSpec.describe "Deployment UI", type: :request do
     get organization_deployments_path(context.organization)
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Deployment history", deployment.service.name)
+    expect(response.body).to include("Deployments", deployment.id.first(7), "All statuses")
     expect(response.body).to include("<main id=\"main-content\"")
 
     get organization_deployment_path(context.organization, deployment)
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include(
-      "Persisted status",
-      "Generated URLs",
-      "Current and previous",
-      "Live logs",
-      "Status timeline",
+      "deployment-page-header",
+      "deployment-logs",
+      "Persisted status history",
+      "Deployment URL",
+      "Environment URL",
+      "Resource size",
+      "Created",
+      "Logs",
       "aria-busy=\"false\"",
+      "h-[500px]",
       "role=\"log\"",
       "Search logs",
-      "<dt>Actor</dt>"
+      "Stream"
     )
     expect(response.body).to include("data-turbo-confirm")
 
@@ -112,7 +116,7 @@ RSpec.describe "Deployment UI", type: :request do
     get organization_deployment_path(context.organization, deployment)
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Members can inspect this deployment")
-    expect(response.body).not_to include("Promote to Production")
+    expect(response.body).not_to include(">Promote<")
 
     post promote_organization_deployment_path(context.organization, deployment)
     expect(response).to have_http_status(:forbidden)
@@ -138,7 +142,11 @@ RSpec.describe "Deployment UI", type: :request do
 
     expect(response).to have_http_status(:ok)
     expect(response.media_type).to eq("text/vnd.turbo-stream.html")
-    expect(response.body).to include("turbo-stream action=\"replace\"", "Queued")
+    expect(response.body).to include(
+      "turbo-stream action=\"replace\" target=\"deployment-page-header\"",
+      "target=\"deployment_live\"",
+      "Deployment queued for execution."
+    )
   end
 
   it "renders retained runtime output after a deployment stops" do
@@ -162,9 +170,10 @@ RSpec.describe "Deployment UI", type: :request do
       "Retained runtime logs",
       "The runtime has stopped",
       "final runtime line",
+      "Canceled",
       "No longer routed"
     )
-    expect(response.body).not_to include("Promote to Production")
+    expect(response.body).not_to include(">Promote<")
 
     post promote_organization_deployment_path(context.organization, deployment)
     expect(response).to redirect_to(organization_deployment_path(context.organization, deployment))
@@ -178,19 +187,19 @@ RSpec.describe "Deployment UI", type: :request do
 
     get organization_deployment_path(context.organization, first)
     expect(response.body).to include(
-      "Promote to Production",
-      "Cancel deployment",
+      "Promote",
+      "Cancel",
       "Redeploy",
       "0.5 vCPU · 256 MiB memory"
     )
-    expect(response.body).not_to include("value=\"Roll back\"")
+    expect(response.body).not_to include("Instant rollback")
 
     post promote_organization_deployment_path(context.organization, first)
     expect(response).to redirect_to(organization_deployment_path(context.organization, first))
     alias_record = Alias.find_by!(service:, environment:, alias_type: :environment)
     expect(alias_record.current_revision).to eq(first_revision)
     get organization_deployment_path(context.organization, first)
-    expect(response.body).not_to include("Promote to Production", "Cancel deployment")
+    expect(response.body).not_to include(">Promote<", ">Cancel<")
 
     second = another_deployment(context:, service:, environment:, sequence: "ui-actions-second")
     second, second_revision = ready_deployment(second, context:, sequence: "ui-actions-second")
@@ -221,8 +230,7 @@ RSpec.describe "Deployment UI", type: :request do
     )).to exist
     advance_deployment(second.reload, to: :canceled)
     get organization_deployment_path(context.organization, first)
-    expect(response.body).to include("Canceled · history only")
-    expect(response.body).not_to include("value=\"Roll back\"")
+    expect(response.body).not_to include("Instant rollback")
 
     operation_id = SecureRandom.uuid_v7
     expect do
@@ -232,6 +240,38 @@ RSpec.describe "Deployment UI", type: :request do
     end.to change(Deployment, :count).by(1)
     expect(response).to redirect_to(
       organization_deployment_path(context.organization, Deployment.order(:created_at, :id).last)
+    )
+  end
+
+  it "renders structured failure details through the legacy alert component" do
+    context, _project, _environment, _service, deployment = create_deployment_domain(sequence: "ui-failure")
+    deployment = Deployments::Transition.call(
+      deployment:,
+      to: :failed,
+      actor: nil,
+      cause: "build rejected",
+      expected_lock_version: deployment.lock_version,
+      error: {
+        "phase" => "building",
+        "code" => "build_failed",
+        "message" => "The image could not be built.",
+        "diagnostic_reference" => "diag-ui-failure"
+      }
+    ).deployment
+    sign_in(context.principal)
+
+    get organization_deployment_path(context.organization, deployment)
+
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include(
+      "alert-destructive",
+      "The image could not be built.",
+      "Phase",
+      "Building",
+      "Code",
+      "build_failed",
+      "Support reference",
+      "diag-ui-failure"
     )
   end
 end

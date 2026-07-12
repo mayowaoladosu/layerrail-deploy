@@ -1,0 +1,19 @@
+<div id="deployment-failure">
+  <% if @failure_transition %>
+    <% error = @failure_transition.error %>
+    <div class="alert-destructive" data-error-phase="<%= error["phase"] %>">
+      <%= legacy_icon("info") %>
+      <section class="space-y-2">
+        <strong><%= error["message"] || "The deployment could not complete." %></strong>
+        <p>Correct the source or runtime issue, then redeploy.</p>
+        <% if error.slice("phase", "code", "diagnostic_reference").values.any?(&:present?) %>
+          <dl class="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+            <% if error["phase"].present? %><div><dt class="text-muted-foreground">Phase</dt><dd><%= error["phase"].humanize %></dd></div><% end %>
+            <% if error["code"].present? %><div><dt class="text-muted-foreground">Code</dt><dd><code><%= error["code"] %></code></dd></div><% end %>
+            <% if error["diagnostic_reference"].present? %><div><dt class="text-muted-foreground">Support reference</dt><dd><code><%= error["diagnostic_reference"] %></code></dd></div><% end %>
+          </dl>
+        <% end %>
+      </section>
+    </div>
+  <% end %>
+</div>

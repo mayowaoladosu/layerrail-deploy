@@ -1,0 +1,40 @@
+<% content_for :title, "Projects · #{@team.name} · LayerRail Deploy" %>
+<%= render "shared/legacy_header" %>
+
+<main id="main-content" class="container max-w-screen-xl mx-auto p-8 space-y-6">
+  <header class="flex justify-between items-center">
+    <h1 class="h1 flex items-center gap-x-3">
+      <%= link_to team_path(@team.slug) do %><%= legacy_avatar(@team, size: :md) %><% end %>
+      <span class="text-muted-foreground/25 font-normal">/</span>
+      Projects
+    </h1>
+  </header>
+
+  <% if @projects.any? %>
+    <section class="space-y-4">
+      <ul>
+        <% @projects.each do |project| %>
+          <li class="flex gap-x-6 items-center border border-b-0 last:border-b first:rounded-t-xl last:rounded-b-xl px-4 h-12 text-sm hover:bg-muted/50 transition-colors min-w-0">
+            <%= link_to project_path(@team.slug, project.slug), class: "flex items-center gap-x-2 font-medium" do %>
+              <%= legacy_avatar(project, size: :xs) %>
+              <span class="truncate max-w-3xs"><%= project.name %></span>
+            <% end %>
+            <span class="flex items-center gap-x-2 text-muted-foreground"><%= legacy_icon("square-stack") %><%= pluralize(project.services.size, "service") %></span>
+            <div class="flex items-center ml-auto">
+              <%= link_to project_path(@team.slug, project.slug), class: "btn-sm-icon-ghost", data: { tooltip: "Open" } do %>
+                <%= legacy_icon("chevron-right") %>
+              <% end %>
+            </div>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% else %>
+    <section class="flex items-center justify-center min-h-60 bg-card text-card-foreground border shadow-sm rounded-xl p-4">
+      <div class="max-w-sm text-center">
+        <h2 class="h4">No projects yet.</h2>
+        <p class="text-muted-foreground mt-1">Create a project from a Git repository.</p>
+      </div>
+    </section>
+  <% end %>
+</main>

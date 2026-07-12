@@ -1,69 +1,56 @@
-<% content_for :title, "Deployments · #{current_organization.name} · LayerRail Deploy" %>
+<% content_for :title, "Deployments · #{@project&.name || current_organization.name} · LayerRail Deploy" %>
+<%= render "shared/legacy_header" %>
 
-<%= render "shared/app_header" %>
-
-<main id="main-content" class="app-shell deployment-index">
-  <nav class="breadcrumbs" aria-label="Breadcrumb">
-    <%= link_to "Organizations", root_path %>
-    <span aria-hidden="true">/</span>
-    <span aria-current="page"><%= current_organization.name %></span>
-  </nav>
-
-  <header class="page-heading page-heading-split">
-    <div>
-      <p class="eyebrow">Release history</p>
-      <h1>Deployments</h1>
-      <p>Every accepted source snapshot keeps its status, artifact history, and immutable URL.</p>
-    </div>
-
-    <%= form_with url: organization_deployments_path(current_organization), method: :get,
-      class: "filter-form", data: { turbo_frame: "_top" } do |form| %>
-      <%= form.label :status, "Filter by status" %>
-      <%= form.select :status,
-        options_for_select(
-          [["All statuses", ""]] + Deployment::STATUSES.keys.map { |status| [deployment_status_label(status), status] },
-          @selected_status
-        ),
-        {} %>
-      <%= form.submit "Apply", class: "button button-secondary" %>
-    <% end %>
+<main id="main-content" class="container max-w-screen-xl mx-auto p-8 space-y-6">
+  <header class="flex justify-between items-center">
+    <h1 class="h1 flex items-center gap-x-3">
+      <% if @project %>
+        <%= link_to project_path(current_organization.slug, @project.slug), class: "shrink-0" do %>
+          <%= legacy_avatar(@project, size: :md) %>
+        <% end %>
+        <span class="text-muted-foreground/25 font-normal">/</span>
+      <% else %>
+        <%= legacy_avatar(current_organization, size: :md) %>
+        <span class="text-muted-foreground/25 font-normal">/</span>
+      <% end %>
+      <span class="truncate">Deployments</span>
+    </h1>
   </header>
 
-  <% if @filter_error %>
-    <div class="inline-alert" role="alert"><%= @filter_error %></div>
-  <% end %>
+  <section class="space-y-4">
+    <%= form_with url: request.path, method: :get, class: "flex items-center gap-x-2", data: { turbo: false } do |form| %>
+      <div role="group" class="button-group">
+        <% if @project %>
+          <%= form.select :environment,
+            options_for_select([["All environments", ""]] + @project.environments.order(:name).map { |environment| [environment.name, environment.slug] }, params[:environment]),
+            {}, class: "h-8 px-3" %>
+        <% end %>
+        <%= form.select :status,
+          options_for_select([["All statuses", ""]] + Deployment::STATUSES.keys.map { |status| [deployment_status_label(status), status] }, @selected_status),
+          {}, class: "h-8 px-3" %>
+        <span class="btn-outline font-normal gap-1.5 h-8 px-3">All dates</span>
+        <label class="btn-outline font-normal gap-1.5 h-8 px-3">
+          <span class="sr-only">From</span>
+          <%= form.date_field :date_from, value: params[:date_from], max: "9999-12-31" %>
+        </label>
+        <%= form.select :branch,
+          options_for_select([["All branches", ""]] + @branches.map { |branch| [branch, branch] }, params[:branch]),
+          {}, class: "h-8 px-3" %>
+        <label class="btn-outline font-normal gap-1.5 h-8 px-3">
+          <span class="sr-only">Until</span>
+          <%= form.date_field :date_to, value: params[:date_to], max: "9999-12-31" %>
+        </label>
+        <button class="btn-sm" type="submit"><%= legacy_icon("search") %>Filter</button>
+      </div>
+      <%= link_to request.path, class: "btn-sm-icon-ghost", aria: { label: "Reset" }, data: { tooltip: "Reset" } do %>
+        <%= legacy_icon("circle-x") %>
+      <% end %>
+    <% end %>
 
-  <% if @deployments.any? %>
-    <ol class="deployment-list" aria-label="Deployment history">
-      <% @deployments.each do |deployment| %>
-        <li>
-          <%= link_to organization_deployment_path(current_organization, deployment), class: "deployment-row" do %>
-            <span class="status-indicator status-<%= deployment_status_tone(deployment.status) %>" aria-hidden="true"></span>
-            <span class="deployment-row-main">
-              <span class="deployment-row-title">
-                <strong><%= deployment.service.name %></strong>
-                <span class="status-badge status-<%= deployment_status_tone(deployment.status) %>"><%= deployment_status_label(deployment.status) %></span>
-              </span>
-              <span><%= deployment.project.name %> · <%= deployment.environment.name %></span>
-              <span class="deployment-source"><%= deployment_source_label(deployment) %></span>
-            </span>
-            <span class="deployment-row-meta">
-              <span><%= time_ago_in_words(deployment.created_at) %> ago</span>
-              <code><%= short_public_id(deployment.id) %></code>
-              <span aria-hidden="true">→</span>
-            </span>
-          <% end %>
-        </li>
-      <% end %>
-    </ol>
-  <% else %>
-    <section class="empty-state" aria-labelledby="empty-deployments-heading">
-      <p class="eyebrow">No matching history</p>
-      <h2 id="empty-deployments-heading">No deployments to show.</h2>
-      <p><%= @selected_status ? "Clear the status filter to review the full history." : "A deployment will appear here after an accepted API or Git event." %></p>
-      <% if @selected_status %>
-        <%= link_to "Clear filter", organization_deployments_path(current_organization), class: "button button-secondary" %>
-      <% end %>
-    </section>
-  <% end %>
+    <% if @filter_error %><div class="alert-destructive"><%= legacy_icon("info") %><section><%= @filter_error %></section></div><% end %>
+
+    <div id="deployments" class="relative">
+      <%= render "legacy/deployment_list", deployments: @deployments, display_project: @project.nil?, display_empty: true %>
+    </div>
+  </section>
 </main>

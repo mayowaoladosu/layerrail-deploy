@@ -1,0 +1,53 @@
+<% content_for :title, "#{@project.name} · LayerRail Deploy" %>
+<%= render "shared/legacy_header" %>
+
+<main id="main-content" class="container max-w-screen-xl mx-auto p-8 space-y-6">
+  <h1 class="h1 flex items-center gap-x-3">
+    <%= legacy_avatar(@project, size: :md) %>
+    <%= @project.name %>
+  </h1>
+
+  <section class="space-y-4">
+    <header class="flex justify-between items-center gap-x-4 h-8">
+      <h2 class="h4">Environments</h2>
+    </header>
+    <ul class="max-sm:flex max-sm:overflow-x-auto scrollbar max-sm:[&>li]:max-w-3xs max-sm:[&>li]:w-full sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <% @environments.each do |environment| %>
+        <li class="bg-card text-card-foreground rounded-xl border shadow-sm p-4">
+          <header class="flex items-center gap-x-2 mb-4 truncate">
+            <%= link_to legacy_deployments_path(@project, environment: environment.slug), class: "flex items-center gap-x-2 h-4 truncate" do %>
+              <span class="w-4 h-4 flex items-center justify-center">
+                <span class="inline-block rounded h-2.5 w-2.5 bg-<%= legacy_environment_color(environment) %>-500 shrink-0"></span>
+              </span>
+              <span class="flex-1 truncate font-medium"><%= environment.name %></span>
+            <% end %>
+          </header>
+          <ul class="space-y-1">
+            <li class="text-muted-foreground flex items-center gap-x-2 [&>svg]:opacity-50 [&>svg]:size-4">
+              <%= legacy_icon("globe") %><span class="truncate"><%= environment.slug %></span>
+            </li>
+            <li class="text-muted-foreground flex items-center gap-x-2 [&>svg]:opacity-50 [&>svg]:size-4">
+              <%= legacy_icon("git-branch") %><span class="truncate"><%= environment.branch || "Not mapped" %></span>
+            </li>
+          </ul>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+
+  <section class="space-y-4">
+    <header class="flex justify-between items-center gap-x-4 h-8">
+      <h2 class="h4">Latest deployments</h2>
+    </header>
+    <div id="deployments">
+      <%= render "legacy/deployment_list", deployments: @deployments, display_empty: true %>
+    </div>
+    <% if @deployments.any? %>
+      <footer class="flex justify-end">
+        <%= link_to legacy_deployments_path(@project), class: "btn-sm-outline", aria: { label: "All deployments" } do %>
+          All deployments<%= legacy_icon("chevron-right") %>
+        <% end %>
+      </footer>
+    <% end %>
+  </section>
+</main>

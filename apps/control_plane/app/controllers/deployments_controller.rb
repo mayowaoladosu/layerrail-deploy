@@ -1,4 +1,5 @@
 class DeploymentsController < OrganizationScopedController
+  before_action :load_legacy_context
   before_action :load_deployment, only: %i[show live download_logs]
 
   def index
@@ -6,6 +7,14 @@ class DeploymentsController < OrganizationScopedController
     scope = policy_scope(Deployment)
       .includes(:project, :service, :environment, :revisions)
       .order(created_at: :desc, id: :desc)
+    scope = scope.where(project: @project) if @project
+    @branches = scope
+      .where("deployments.source_snapshot ->> 'type' = 'git'")
+      .reorder(nil)
+      .distinct
+      .pluck(Arel.sql("deployments.source_snapshot ->> 'reference'"))
+      .compact
+      .sort
     if params[:status].present?
       if Deployment::STATUSES.key?(params[:status])
         scope = scope.where(status: params[:status])
@@ -14,6 +23,26 @@ class DeploymentsController < OrganizationScopedController
         @filter_error = "Choose a valid deployment status."
       end
     end
+    if @project && params[:environment].present?
+      environment = @project.environments.find_by(slug: params[:environment])
+      environment ? scope = scope.where(environment:) : @filter_error = "Choose a valid environment."
+    end
+    if params[:branch].present?
+      if @branches.include?(params[:branch])
+        scope = scope.where("deployments.source_snapshot ->> 'reference' = ?", params[:branch])
+      else
+        @filter_error = "Choose a valid branch."
+      end
+    end
+    if params[:date_from].present?
+      scope = scope.where("deployments.created_at >= ?", Date.iso8601(params[:date_from]).beginning_of_day)
+    end
+    if params[:date_to].present?
+      scope = scope.where("deployments.created_at <= ?", Date.iso8601(params[:date_to]).end_of_day)
+    end
+    @deployments = scope.limit(100)
+  rescue Date::Error
+    @filter_error = "Choose a valid date range."
     @deployments = scope.limit(100)
   end
 
@@ -27,10 +56,24 @@ class DeploymentsController < OrganizationScopedController
 
     respond_to do |format|
       format.turbo_stream do
-        render turbo_stream: turbo_stream.replace(
-          "deployment_live",
-          partial: "deployments/live"
-        )
+        render turbo_stream: [
+          turbo_stream.replace(
+            "deployment-page-header",
+            partial: "deployments/header"
+          ),
+          turbo_stream.replace(
+            "deployment-failure",
+            partial: "deployments/failure"
+          ),
+          turbo_stream.replace(
+            "deployment_live",
+            partial: "deployments/live"
+          ),
+          turbo_stream.replace(
+            "deployment-history",
+            partial: "deployments/history"
+          )
+        ]
       end
       format.html { render partial: "deployments/live", layout: false }
     end
@@ -53,10 +96,38 @@ class DeploymentsController < OrganizationScopedController
 
   private
 
+  def load_legacy_context
+    @team = current_organization
+    @project = if params[:project_name].present?
+      current_organization.projects.find_by!(slug: params[:project_name])
+    end
+    @latest_teams = current_principal.organizations
+      .where.not(id: current_organization.id)
+      .order(updated_at: :desc, id: :desc)
+      .limit(5)
+    @latest_projects = current_organization.projects
+      .where(lifecycle_state: :active)
+      .where.not(id: @project&.id)
+      .order(updated_at: :desc, id: :desc)
+      .limit(5)
+    @latest_deployments = if @project
+      policy_scope(Deployment)
+        .where(project: @project)
+        .where.not(id: params[:id])
+        .includes(:project, :environment)
+        .order(created_at: :desc, id: :desc)
+        .limit(5)
+    else
+      []
+    end
+  end
+
   def load_deployment
-    @deployment = policy_scope(Deployment)
+    scope = policy_scope(Deployment)
       .includes(:project, :service, :environment, :configuration_snapshot)
-      .find(params[:id])
+    scope = scope.where(project: @project) if @project
+    @deployment = scope.find(params[:id])
+    @project ||= @deployment.project
     authorize @deployment, :show?
   end
 
@@ -69,6 +140,7 @@ class DeploymentsController < OrganizationScopedController
       .index_by(&:id)
     @builds = @deployment.builds.order(:attempt)
     @revision = @deployment.revisions.where(status: "ready").order(:created_at, :id).last
+    @repository_connection = @deployment.service.repository_connection
     @alias_record = Alias.find_by(
       organization: current_organization,
       service: @deployment.service,

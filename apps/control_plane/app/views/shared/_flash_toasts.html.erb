@@ -1,0 +1,12 @@
+<div id="toaster" class="toaster">
+  <% flash.each do |type, message| %>
+    <% category = type.to_s.in?([ "alert", "error" ]) ? "error" : type.to_s.in?([ "warning", "info" ]) ? type.to_s : "success" %>
+    <% icon = { "error" => "circle-x", "warning" => "triangle-alert", "info" => "info", "success" => "circle-check" }.fetch(category) %>
+    <div class="toast" role="<%= category == "error" ? "alert" : "status" %>" aria-atomic="true" aria-hidden="false" data-category="<%= category %>" tabindex="-1" data-controller="focus">
+      <div class="toast-content">
+        <%= legacy_icon(icon) %>
+        <section><p><%= message %></p></section>
+      </div>
+    </div>
+  <% end %>
+</div>

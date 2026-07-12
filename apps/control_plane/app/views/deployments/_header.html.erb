@@ -1,0 +1,138 @@
+<% preview_url = "#{ENV.fetch("CONTROL_PLANE_SCHEME", "http")}://#{Routing::Hostnames.immutable(@deployment)}" %>
+<% environment_url = @alias_record && "#{ENV.fetch("CONTROL_PLANE_SCHEME", "http")}://#{Routing::Hostnames.environment(@alias_record)}" %>
+
+<header class="flex items-center gap-x-4 justify-between">
+  <h1 class="h1 flex items-center gap-x-3">
+    <%= link_to project_path(current_organization.slug, @project.slug), class: "shrink-0" do %>
+      <%= legacy_avatar(@project, size: :md) %>
+    <% end %>
+    <span class="text-muted-foreground/25 font-normal">/</span>
+    <%= link_to "Deployments", project_deployments_path(current_organization.slug, @project.slug) %>
+    <span class="text-muted-foreground/25 font-normal">/</span>
+    <span class="font-mono"><%= @deployment.id.first(7) %></span>
+  </h1>
+
+  <div class="flex items-center gap-x-2 ml-auto">
+    <% if @can_cancel %>
+      <%= button_to cancel_project_deployment_path(current_organization.slug, @project.slug, @deployment),
+        method: :post,
+        class: "btn-destructive",
+        form: { data: { turbo_confirm: "Cancel this deployment? Its history will remain available." } } do %>
+        <%= legacy_icon("circle-x") %>Cancel
+      <% end %>
+    <% end %>
+
+    <div class="flex items-center">
+      <% if @revision && !@deployment.terminal? %>
+        <%= link_to preview_url,
+          target: "_blank",
+          rel: "noopener",
+          class: "btn gap-x-2 rounded-r-none" do %>
+          <%= legacy_icon("link-2") %>Visit
+        <% end %>
+      <% else %>
+        <button type="button" class="btn gap-x-2 rounded-r-none" disabled><%= legacy_icon("link-2") %>Visit</button>
+      <% end %>
+
+      <div class="popover">
+        <button type="button" class="btn-icon w-6 border-l-0 rounded-l-none" aria-expanded="false" aria-controls="deployment-routes-popover">
+          <%= legacy_icon("chevrons-up-down") %>
+        </button>
+        <div id="deployment-routes-popover" data-popover aria-hidden="true" data-align="end" class="max-w-xs">
+          <ul class="space-y-3">
+            <li class="space-y-1">
+              <div class="text-muted-foreground text-xs">Deployment URL</div>
+              <% if @revision && !@deployment.terminal? %>
+                <%= link_to preview_url, preview_url, target: "_blank", rel: "noopener", class: "flex items-center gap-x-2 hover:underline min-w-0" %>
+              <% else %>
+                <code class="block truncate"><%= preview_url %></code>
+                <small class="text-muted-foreground"><%= @deployment.terminal? ? "No longer routed" : "Available after a candidate starts" %></small>
+              <% end %>
+            </li>
+            <% if @alias_record %>
+              <li class="space-y-1">
+                <div class="text-muted-foreground text-xs"><%= @deployment.environment.name %> environment URL</div>
+                <%= link_to environment_url, environment_url, target: "_blank", rel: "noopener", class: "flex items-center gap-x-2 hover:underline min-w-0" %>
+                <small class="text-muted-foreground"><%= @serving ? "Points to this revision" : "Points to another ready revision" %></small>
+              </li>
+              <li class="space-y-1">
+                <div class="text-muted-foreground text-xs">Current</div>
+                <%= link_to @alias_record.current_revision.deployment.id.first(7), legacy_deployment_path(@alias_record.current_revision.deployment), class: "font-mono hover:underline" %>
+              </li>
+              <li class="space-y-1">
+                <div class="text-muted-foreground text-xs">Previous</div>
+                <% if @alias_record.previous_revision %>
+                  <%= link_to @alias_record.previous_revision.deployment.id.first(7), legacy_deployment_path(@alias_record.previous_revision.deployment), class: "font-mono hover:underline" %>
+                <% else %>
+                  <span>None yet</span>
+                <% end %>
+              </li>
+            <% else %>
+              <li class="space-y-1"><div class="text-muted-foreground text-xs">Environment URL</div><span>No revision has been promoted to this environment yet.</span></li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <% if @can_rollback || @can_promote || @can_redeploy || !@can_manage %>
+      <div class="dropdown-menu">
+        <button type="button" class="btn-icon-outline" aria-haspopup="menu"><%= legacy_icon("ellipsis") %></button>
+        <div data-popover aria-hidden="true" data-align="end">
+          <div role="menu"><%= render "deployments/actions" %></div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</header>
+
+<div class="space-y-4">
+  <ul class="flex flex-wrap gap-x-6 gap-y-2 items-start">
+    <li class="flex items-center gap-x-2" data-tooltip="Status"><%= legacy_status(@deployment) %></li>
+    <li class="flex items-center gap-x-2 text-muted-foreground [&>svg]:opacity-50 [&>svg]:size-4" data-tooltip="Duration">
+      <%= legacy_icon("timer") %><%= deployment_duration(@deployment, @transitions) %>
+    </li>
+    <li class="flex items-center gap-x-2 text-muted-foreground [&>svg]:opacity-50 [&>svg]:size-4" data-tooltip="Created">
+      <%= legacy_icon("circle") %><time datetime="<%= @deployment.created_at.utc.iso8601(6) %>"><%= display_timestamp(@deployment.created_at) %></time>
+    </li>
+    <li class="flex items-center gap-x-2 text-muted-foreground [&>svg]:opacity-50 [&>svg]:size-4" data-tooltip="Resource size">
+      <%= legacy_icon("layers") %><%= deployment_resource_size(@revision) %>
+    </li>
+    <% if @serving %>
+      <li><span class="badge-secondary"><%= legacy_icon("sparkle") %>Current</span></li>
+    <% elsif @alias_record&.previous_revision&.deployment_id == @deployment.id %>
+      <li><span class="badge-secondary text-muted-foreground">Previous</span></li>
+    <% end %>
+  </ul>
+
+  <ul class="flex flex-wrap gap-x-6 gap-y-2 items-start">
+    <li>
+      <%= link_to legacy_deployments_path(@project, environment: @deployment.environment.slug), class: "flex items-center gap-x-2 text-muted-foreground hover:text-foreground" do %>
+        <span class="w-4 h-4 flex items-center justify-center"><span class="inline-block rounded h-2.5 w-2.5 bg-<%= legacy_environment_color(@deployment.environment) %>-500 shrink-0"></span></span>
+        <%= @deployment.environment.name %>
+      <% end %>
+    </li>
+    <li class="flex items-center gap-x-2 text-muted-foreground [&>svg]:opacity-50 [&>svg]:size-4" data-tooltip="Service"><%= legacy_icon("square-stack") %><%= @deployment.service.name %></li>
+    <li class="flex items-center gap-x-2 text-muted-foreground [&>svg]:opacity-50 [&>svg]:size-4"><%= legacy_icon("zap") %><%= @deployment.trigger.humanize %> by <%= deployment_author(@transitions, @actors) %></li>
+    <% if @deployment.source_snapshot["type"] == "git" %>
+      <% branch = @deployment.source_snapshot["reference"] %>
+      <% commit = @deployment.source_snapshot["commit_sha"].to_s %>
+      <li class="min-w-0">
+        <% if @repository_connection %>
+          <%= link_to "https://github.com/#{@repository_connection.full_name}/tree/#{ERB::Util.url_encode(branch)}", target: "_blank", rel: "noopener", class: "flex items-center gap-x-2 text-muted-foreground hover:text-foreground [&>svg]:opacity-50 [&>svg]:size-4" do %><%= legacy_icon("git-branch") %><span class="truncate"><%= branch %></span><% end %>
+        <% else %>
+          <span class="flex items-center gap-x-2 text-muted-foreground [&>svg]:opacity-50 [&>svg]:size-4"><%= legacy_icon("git-branch") %><%= branch %></span>
+        <% end %>
+      </li>
+      <li class="min-w-0">
+        <% if @repository_connection %>
+          <%= link_to "https://github.com/#{@repository_connection.full_name}/commit/#{commit}", target: "_blank", rel: "noopener", class: "flex items-center gap-x-2 text-muted-foreground hover:text-foreground [&>svg]:opacity-50 [&>svg]:size-4 font-mono" do %><%= legacy_icon("git-commit-horizontal") %><%= commit.first(7) %><% end %>
+        <% else %>
+          <span class="flex items-center gap-x-2 text-muted-foreground [&>svg]:opacity-50 [&>svg]:size-4 font-mono"><%= legacy_icon("git-commit-horizontal") %><%= commit.first(7) %></span>
+        <% end %>
+      </li>
+    <% else %>
+      <li class="flex items-center gap-x-2 text-muted-foreground [&>svg]:opacity-50 [&>svg]:size-4"><%= legacy_icon("square-stack") %><%= deployment_source_label(@deployment) %></li>
+    <% end %>
+  </ul>
+</div>
