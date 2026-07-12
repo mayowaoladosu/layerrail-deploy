@@ -12,3 +12,7 @@ Each record includes its status, date, relevant requirements, context, decision 
 - [ADR-004: Project-scoped environments](0004-project-scoped-environments.md)
 - [ADR-005: Installation-scoped Git provider seam](0005-installation-scoped-git-provider-seam.md)
 - [ADR-006: Ephemeral GitHub installation tokens](0006-ephemeral-github-installation-tokens.md)
+- [ADR-007: Rootless BuildKit proof boundary](0007-rootless-buildkit-proof-boundary.md)
+- [ADR-008: Phase 2 cell, cloud target and sandbox](0008-phase-2-cell-and-sandbox.md)
+- [ADR-009: Temporal workflow boundary](0009-temporal-workflow-boundary.md)
+- [ADR-010: Alpha artifact services and immutable publication](0010-alpha-artifact-services.md)
