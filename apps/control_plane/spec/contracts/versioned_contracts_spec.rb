@@ -11,6 +11,8 @@ RSpec.describe "Versioned contracts" do
   let(:openapi_path) { contracts_root.join("openapi/v1/openapi.yaml") }
   let(:event_schema_path) { contracts_root.join("events/v1/event-envelope.schema.json") }
   let(:event_example_paths) { contracts_root.join("events/v1/examples").glob("*.json").sort }
+  let(:runtime_logs_schema_path) { contracts_root.join("provider/v1/runtime-logs.schema.json") }
+  let(:runtime_logs_example_path) { contracts_root.join("provider/v1/examples/runtime-logs.json") }
 
   describe "the public REST API" do
     let(:authentication_operations) do
@@ -107,6 +109,15 @@ RSpec.describe "Versioned contracts" do
       example = JSON.parse(event_example_paths.first.read).except("organization_id")
 
       expect(JSONSchemer.schema(schema)).not_to be_valid(example)
+    end
+  end
+
+  describe "the local provider log response" do
+    it "is a valid bounded JSON Schema with a canonical example" do
+      schema = JSON.parse(runtime_logs_schema_path.read)
+
+      expect(JSONSchemer.valid_schema?(schema)).to be(true)
+      expect(JSONSchemer.schema(schema)).to be_valid(JSON.parse(runtime_logs_example_path.read))
     end
   end
 end

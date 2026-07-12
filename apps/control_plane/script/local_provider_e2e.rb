@@ -129,9 +129,20 @@ begin
   first_response = create_deployment.call("first")
   first = wait_ready.call(first_response.fetch("id"))
   first_revision = first.revisions.where(status: "ready").sole
+  raise "Provider resource evidence is missing" unless first_revision.readiness["resources"] == {
+    "cpu_millicores" => 500,
+    "memory_bytes" => 268435456
+  }
   immutable = wait_for.call("first immutable route") do
     body = route_body.call(Routing::Hostnames.immutable(first))
     body if body&.fetch("deployment_id") == first.id
+  end
+  runtime_log = wait_for.call("signed runtime log retrieval") do
+    result = LocalProvider::LogClient.fetch(
+      organization_id: first.organization_id,
+      deployment_id: first.id
+    )
+    result.entries.find { |entry| entry.message.include?("sample-web") } if result.status == :ok
   end
   promote.call(first_revision.id, "first")
   alias_record = Alias.find_by!(service:, environment:, alias_type: :environment)
@@ -179,12 +190,30 @@ begin
   wait_for.call("second immutable route removal") do
     route_body.call(Routing::Hostnames.immutable(second)).nil?
   end
+  retained_logs = wait_for.call("retained runtime log state") do
+    result = LocalProvider::LogClient.fetch(
+      organization_id: second.organization_id,
+      deployment_id: second.id
+    )
+    result if result.status == :ok && result.retained
+  end
   serving = wait_for.call("rolled-back route after cancellation") do
     body = route_body.call(alias_hostname)
     body if body&.fetch("deployment_id") == first.id
   end
   alias_record.reload
   raise "Cancellation changed the serving Alias" unless alias_record.current_revision_id == first_revision.id
+  begin
+    Aliases::Promote.call(
+      context:,
+      revision: second_revision,
+      alias_type: :environment,
+      name: environment.slug
+    )
+    raise "Canceled runtime became routable"
+  rescue Aliases::Promote::RevisionNotReady
+    nil
+  end
 
   puts JSON.generate(
     status: "ok",
@@ -195,11 +224,17 @@ begin
     immutable_url: first_response.fetch("preview_url"),
     alias_url: "http://#{alias_hostname}",
     immutable_response: immutable,
+    runtime_log: {
+      timestamp: runtime_log.timestamp.iso8601(6),
+      stream: runtime_log.stream,
+      message: runtime_log.message
+    },
     rollback_response: rolled_back,
     post_cancellation_response: serving,
     canceled_status: canceled.status,
     cancellation_command_id: cancellation_command.id,
     cancellation_command_status: cancellation_command.status,
+    retained_runtime_log_count: retained_logs.entries.length,
     build_count:
   )
 ensure

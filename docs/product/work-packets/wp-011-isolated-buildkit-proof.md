@@ -45,6 +45,7 @@ Both builds must produce artifacts, the plaintext must be absent from both progr
 - Concurrent owner/attacker builds complete while the attacker cannot traverse to the owner's secret, daemon socket, or daemon cache.
 - Secret plaintext is absent from build logs and persistent daemon state.
 - `scripts/buildkit-isolation-e2e.sh` passes on Docker Desktop and in the dedicated GitHub Actions isolation job.
+- Failed CI proofs print the bounded BuildKit/canary logs before cleanup; Ubuntu 24.04 enables the upstream-documented unprivileged-userns prerequisite on its ephemeral runner.
 
 ## Deliberate limitations
 

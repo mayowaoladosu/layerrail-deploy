@@ -23,6 +23,8 @@ Use the digest-pinned `moby/buildkit:v0.26.2-rootless` image for WP-011 with the
 6. Use scratch-based fixtures and a direct-IP canary to prove blocked metadata/control-plane access without external pulls.
 7. Mount build secrets through the BuildKit session and test concurrent process/root isolation plus post-build non-persistence.
 
+Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor by default. The dedicated ephemeral GitHub Actions runner sets `kernel.apparmor_restrict_unprivileged_userns=0` as recommended by the upstream rootless guide, and ensures `user.max_user_namespaces` is non-zero, before starting the proof. No production host policy is changed by this CI-only setup.
+
 ## Consequences
 
 The proof can execute malicious fixture commands and produce exported artifacts while giving deterministic negative evidence for the named access paths. It is self-contained, repeatable, and suitable for CI.

@@ -8,6 +8,7 @@ from uuid import NAMESPACE_URL, uuid5
 
 from .contracts import Envelope
 from .control_plane import ControlPlaneClient, ControlPlaneUnavailable
+from .logs import RuntimeLogFormatter
 from .routing import InvalidRoute, RouteWriter
 from .runtime import (
     DockerRuntime,
@@ -38,12 +39,14 @@ class Processor:
         routes: RouteWriter,
         control_plane: ControlPlaneClient,
         allowed_image_reference: str = "lrail-local-sample:dev",
+        log_formatter: RuntimeLogFormatter | None = None,
     ):
         self._store = store
         self._runtime = runtime
         self._routes = routes
         self._control_plane = control_plane
         self._allowed_image_reference = allowed_image_reference
+        self._log_formatter = log_formatter or RuntimeLogFormatter()
 
     async def process(self, envelope: Envelope) -> dict[str, Any]:
         try:
@@ -154,6 +157,7 @@ class Processor:
                 "readiness": {
                     "status": "passed",
                     "checked_at": self._now(),
+                    "resources": self._runtime.resource_profile(),
                 },
             },
         )
@@ -206,6 +210,21 @@ class Processor:
         deployment_id = str(data.get("deployment_id", ""))
         if not deployment_id:
             raise PermanentCommandError("Cancellation command is incomplete")
+        try:
+            lines = await self._runtime.logs(
+                deployment_id=deployment_id,
+                organization_id=str(envelope.value["organization_id"]),
+                limit=1000,
+            )
+            entries, truncated = self._log_formatter.format(lines)
+            self._store.save_runtime_logs(
+                deployment_id=deployment_id,
+                organization_id=str(envelope.value["organization_id"]),
+                entries=entries,
+                truncated=truncated,
+            )
+        except (RuntimeConflict, RuntimeUnavailable):
+            pass
         await self._runtime.remove(
             deployment_id=deployment_id,
             organization_id=str(envelope.value["organization_id"]),

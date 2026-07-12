@@ -17,7 +17,11 @@
     "cell": "docker-desktop",
     "readiness": {
       "status": "passed",
-      "checked_at": "2026-07-12T00:00:00Z"
+      "checked_at": "2026-07-12T00:00:00Z",
+      "resources": {
+        "cpu_millicores": 500,
+        "memory_bytes": 268435456
+      }
     }
   }
 }

@@ -1,0 +1,69 @@
+<% content_for :title, "Deployments · #{current_organization.name} · LayerRail Deploy" %>
+
+<%= render "shared/app_header" %>
+
+<main id="main-content" class="app-shell deployment-index">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    <%= link_to "Organizations", root_path %>
+    <span aria-hidden="true">/</span>
+    <span aria-current="page"><%= current_organization.name %></span>
+  </nav>
+
+  <header class="page-heading page-heading-split">
+    <div>
+      <p class="eyebrow">Release history</p>
+      <h1>Deployments</h1>
+      <p>Every accepted source snapshot keeps its status, artifact history, and immutable URL.</p>
+    </div>
+
+    <%= form_with url: organization_deployments_path(current_organization), method: :get,
+      class: "filter-form", data: { turbo_frame: "_top" } do |form| %>
+      <%= form.label :status, "Filter by status" %>
+      <%= form.select :status,
+        options_for_select(
+          [["All statuses", ""]] + Deployment::STATUSES.keys.map { |status| [deployment_status_label(status), status] },
+          @selected_status
+        ),
+        {} %>
+      <%= form.submit "Apply", class: "button button-secondary" %>
+    <% end %>
+  </header>
+
+  <% if @filter_error %>
+    <div class="inline-alert" role="alert"><%= @filter_error %></div>
+  <% end %>
+
+  <% if @deployments.any? %>
+    <ol class="deployment-list" aria-label="Deployment history">
+      <% @deployments.each do |deployment| %>
+        <li>
+          <%= link_to organization_deployment_path(current_organization, deployment), class: "deployment-row" do %>
+            <span class="status-indicator status-<%= deployment_status_tone(deployment.status) %>" aria-hidden="true"></span>
+            <span class="deployment-row-main">
+              <span class="deployment-row-title">
+                <strong><%= deployment.service.name %></strong>
+                <span class="status-badge status-<%= deployment_status_tone(deployment.status) %>"><%= deployment_status_label(deployment.status) %></span>
+              </span>
+              <span><%= deployment.project.name %> · <%= deployment.environment.name %></span>
+              <span class="deployment-source"><%= deployment_source_label(deployment) %></span>
+            </span>
+            <span class="deployment-row-meta">
+              <span><%= time_ago_in_words(deployment.created_at) %> ago</span>
+              <code><%= short_public_id(deployment.id) %></code>
+              <span aria-hidden="true">→</span>
+            </span>
+          <% end %>
+        </li>
+      <% end %>
+    </ol>
+  <% else %>
+    <section class="empty-state" aria-labelledby="empty-deployments-heading">
+      <p class="eyebrow">No matching history</p>
+      <h2 id="empty-deployments-heading">No deployments to show.</h2>
+      <p><%= @selected_status ? "Clear the status filter to review the full history." : "A deployment will appear here after an accepted API or Git event." %></p>
+      <% if @selected_status %>
+        <%= link_to "Clear filter", organization_deployments_path(current_organization), class: "button button-secondary" %>
+      <% end %>
+    </section>
+  <% end %>
+</main>

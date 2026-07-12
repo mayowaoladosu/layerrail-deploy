@@ -2,9 +2,10 @@
 
 Versioned public and internal interfaces live here:
 
-- `openapi/` for HTTP APIs.
-- `events/` for JSON Schema event contracts.
-- `protobuf/` only after an ADR approves gRPC.
+- `openapi/v1/` defines the public REST API.
+- `events/v1/` defines the canonical durable event envelope and examples.
+- `provider/v1/` defines authenticated internal provider response payloads, including bounded runtime logs.
+- `protobuf/` is reserved until an ADR approves gRPC.
 
 Every cross-component request or event requires a versioned schema and compatibility test. Rails owns the customer-facing contract.
 

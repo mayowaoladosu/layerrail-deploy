@@ -3,6 +3,7 @@ module Aliases
     class RevisionNotReady < StandardError; end
 
     Result = Data.define(:alias_record, :event)
+    PROMOTABLE_DEPLOYMENT_STATUSES = %w[ready promoted superseded].freeze
 
     def self.call(context:, revision:, alias_type:, name:)
       new(context:, revision:, alias_type:, name:).call
@@ -27,7 +28,6 @@ module Aliases
         current_revision_status: "ready"
       )
       authorize!(candidate)
-      raise RevisionNotReady unless @revision.status == "ready"
 
       ApplicationRecord.transaction(requires_new: true) do
         lock_alias!
@@ -37,6 +37,12 @@ module Aliases
           name: @name
         )
         alias_record.lock! if alias_record.persisted?
+        deployment = @revision.deployment
+        deployment.lock!
+        @revision.reload
+        unless @revision.status == "ready" && deployment.status.in?(PROMOTABLE_DEPLOYMENT_STATUSES)
+          raise RevisionNotReady
+        end
         if alias_record.current_revision_id == @revision.id
           event = publish_routing!(alias_record).event
           return Result.new(alias_record:, event:)
@@ -58,7 +64,7 @@ module Aliases
           current_revision_status: "ready"
         )
         alias_record.save!
-        promote_deployment!(@revision.deployment)
+        promote_deployment!(deployment)
         supersede_deployment!(old_revision&.deployment)
         event = publish_routing!(alias_record).event
 

@@ -27,6 +27,7 @@ services:
       XDG_DATA_HOME: /tmp/data
       POSTGRES_HOST: pgsql
       POSTGRES_PORT: 5432
+      LOCAL_PROVIDER_URL: http://local-provider:9000
       CONTROL_PLANE_DATABASE: ${CONTROL_PLANE_DATABASE:-lrail_control_plane_development}
       CONTROL_PLANE_TEST_DATABASE: ${CONTROL_PLANE_TEST_DATABASE:-lrail_control_plane_test}
     ports:

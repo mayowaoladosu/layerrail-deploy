@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.layerrail.local/provider/v1/runtime-logs.schema.json",
+  "title": "Local provider runtime log response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entries", "truncated", "retained"],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["timestamp", "stream", "message"],
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "stream": {
+            "const": "runtime"
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        }
+      }
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "retained": {
+      "type": "boolean",
+      "description": "True when the runtime has stopped and the provider returned its last redacted snapshot."
+    }
+  }
+}

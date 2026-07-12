@@ -1,0 +1,82 @@
+<section class="surface-card log-card"
+  aria-labelledby="logs-heading"
+  data-controller="log-filter"
+  data-log-filter-storage-key-value="deployment-log-filter:<%= @deployment.id %>">
+  <div class="card-heading-row">
+    <div>
+      <p class="eyebrow">Build and runtime output</p>
+      <h3 id="logs-heading">Live logs</h3>
+    </div>
+    <div class="log-heading-actions">
+      <% if @provider_logs.status == :ok && @provider_logs.retained %>
+        <span class="connection-state">Retained runtime logs</span>
+      <% elsif @provider_logs.status == :ok %>
+        <span class="connection-state connection-live">Runtime connected</span>
+      <% else %>
+        <span class="connection-state">Persisted events only</span>
+      <% end %>
+      <%= link_to "Download",
+        download_logs_organization_deployment_path(current_organization, @deployment),
+        class: "log-download",
+        data: { turbo: false } %>
+    </div>
+  </div>
+
+  <div class="log-controls" role="search" aria-label="Filter deployment logs">
+    <label>
+      <span>Search logs</span>
+      <input type="search"
+        placeholder="Filter visible messages"
+        autocomplete="off"
+        data-log-filter-target="query"
+        data-action="input->log-filter#filter">
+    </label>
+    <label>
+      <span>Stream</span>
+      <select data-log-filter-target="stream" data-action="change->log-filter#filter">
+        <option value="all">All streams</option>
+        <option value="build">Build</option>
+        <option value="runtime">Runtime</option>
+        <option value="system">System</option>
+      </select>
+    </label>
+  </div>
+
+  <% if @provider_logs.status == :unavailable %>
+    <div class="partial-state" role="status">
+      Runtime output is temporarily unavailable. Persisted build and status events remain complete, and live updates will retry.
+    </div>
+  <% elsif @provider_logs.status == :not_found %>
+    <div class="partial-state" role="status">
+      <% if @deployment.terminal? %>
+        The runtime is no longer active. Persisted build and status events remain below.
+      <% else %>
+        Runtime output will appear after a candidate starts.
+      <% end %>
+    </div>
+  <% elsif @provider_logs.retained %>
+    <div class="partial-state" role="status">
+      The runtime has stopped. Its latest redacted output is retained with the persisted deployment events below.
+    </div>
+  <% end %>
+
+  <% if @log_feed.truncated %>
+    <p class="log-retention-note">Showing the latest 200 runtime lines plus persisted deployment events.</p>
+  <% end %>
+
+  <ol class="log-list" role="log" aria-live="off" aria-label="Deployment log entries">
+    <% @log_feed.entries.each do |entry| %>
+      <li class="log-entry log-level-<%= entry.level %>"
+        aria-label="<%= entry.timestamp.utc.strftime("%H:%M:%S") %> <%= entry.stream %> <%= entry.level %>: <%= entry.message %>"
+        data-log-filter-target="entry"
+        data-stream="<%= entry.stream %>"
+        data-message="<%= entry.message.downcase %>">
+        <time datetime="<%= entry.timestamp.utc.iso8601(6) %>"><%= entry.timestamp.utc.strftime("%H:%M:%S") %></time>
+        <span class="log-stream"><%= entry.stream %></span>
+        <code><%= entry.message %></code>
+      </li>
+    <% end %>
+  </ol>
+
+  <p class="empty-filter-state" data-log-filter-target="empty" hidden>No visible log entries match this filter.</p>
+</section>

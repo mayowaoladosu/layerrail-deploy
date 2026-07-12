@@ -1,0 +1,12 @@
+<% content_for :title, "Not found · LayerRail Deploy" %>
+
+<%= render "shared/app_header" if current_principal %>
+
+<main id="main-content" class="app-shell error-shell">
+  <section class="empty-state" aria-labelledby="not-found-heading">
+    <p class="eyebrow">Not found</p>
+    <h1 id="not-found-heading">That deployment is not available.</h1>
+    <p>It may have been removed, or it may belong to an organization this account cannot access.</p>
+    <%= link_to "Return to your organizations", root_path, class: "button button-primary" %>
+  </section>
+</main>

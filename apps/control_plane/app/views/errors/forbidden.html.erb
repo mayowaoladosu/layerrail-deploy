@@ -1,0 +1,14 @@
+<% content_for :title, "Action unavailable · LayerRail Deploy" %>
+
+<%= render "shared/app_header" if current_principal %>
+
+<main id="main-content" class="app-shell error-shell">
+  <section class="empty-state" aria-labelledby="forbidden-heading">
+    <p class="eyebrow">Action unavailable</p>
+    <h1 id="forbidden-heading">This role cannot change deployment routing.</h1>
+    <p>Organization members can inspect status and logs. Ask an owner or administrator to cancel, redeploy, promote, or roll back.</p>
+    <%= link_to "Return to deployments",
+      current_organization ? organization_deployments_path(current_organization) : root_path,
+      class: "button button-primary" %>
+  </section>
+</main>

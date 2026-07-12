@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_217000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -86,7 +86,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_217000) do
     t.check_constraint "attempt > 0", name: "builds_attempt_positive"
     t.check_constraint "idempotency_key::text = btrim(idempotency_key::text) AND idempotency_key::text <> ''::text", name: "builds_idempotency_key_normalized"
     t.check_constraint "jsonb_typeof(evidence) = 'object'::text", name: "builds_evidence_object"
-    t.check_constraint "status::text = 'running'::text AND artifact_digest IS NULL AND finished_at IS NULL OR status::text = 'succeeded'::text AND artifact_digest IS NOT NULL AND finished_at IS NOT NULL OR (status::text = ANY (ARRAY['failed'::character varying, 'canceled'::character varying]::text[])) AND artifact_digest IS NULL AND finished_at IS NOT NULL", name: "builds_lifecycle_consistent"
+    t.check_constraint "status::text = 'running'::text AND artifact_digest IS NULL AND finished_at IS NULL OR status::text = 'succeeded'::text AND artifact_digest IS NOT NULL AND finished_at IS NOT NULL OR (status::text = 'failed'::text OR status::text = 'canceled'::text) AND artifact_digest IS NULL AND finished_at IS NOT NULL", name: "builds_lifecycle_consistent"
     t.check_constraint "status::text = 'running'::text OR status::text = 'succeeded'::text OR status::text = 'failed'::text OR status::text = 'canceled'::text", name: "builds_status_allowed"
   end
 
@@ -455,7 +455,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_217000) do
     t.check_constraint "jsonb_typeof(readiness) = 'object'::text", name: "revisions_readiness_object"
     t.check_constraint "jsonb_typeof(runtime_policy_snapshot) = 'object'::text", name: "revisions_runtime_policy_object"
     t.check_constraint "region::text = btrim(region::text) AND region::text <> ''::text", name: "revisions_region_normalized"
-    t.check_constraint "status::text = 'candidate'::text AND ready_at IS NULL OR (status::text = ANY (ARRAY['ready'::character varying, 'retired'::character varying]::text[])) AND ready_at IS NOT NULL", name: "revisions_lifecycle_consistent"
+    t.check_constraint "status::text = 'candidate'::text AND ready_at IS NULL OR (status::text = 'ready'::text OR status::text = 'retired'::text) AND ready_at IS NOT NULL", name: "revisions_lifecycle_consistent"
     t.check_constraint "status::text = 'candidate'::text OR status::text = 'ready'::text OR status::text = 'retired'::text", name: "revisions_status_allowed"
   end
 

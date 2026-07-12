@@ -74,16 +74,6 @@ class AuthenticationController < ApplicationController
 
   private
 
-  def web_authenticated?
-    current_principal && request.env["lrail.authentication_method"] == "cookie"
-  end
-
-  def require_web_session!
-    return if web_authenticated? && current_authentication_session
-
-    redirect_to auth_login_path, status: :see_other
-  end
-
   def set_authentication_cookie(result)
     cookies[Authentication::Middleware::COOKIE_NAME] = {
       value: result.token,

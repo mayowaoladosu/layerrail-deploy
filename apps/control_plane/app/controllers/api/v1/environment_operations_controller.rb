@@ -119,7 +119,7 @@ module Api
       end
 
       def render_revision_not_ready
-        render_conflict("revision_not_ready", "Only a ready Revision can receive traffic")
+        render_conflict("revision_not_ready", "Only an active ready Revision can receive traffic")
       end
 
       def render_previous_revision_missing

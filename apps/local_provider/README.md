@@ -8,6 +8,7 @@ This Python service is the development-only infrastructure provider behind the R
 - Web workload on port 8000 with an HTTP readiness path.
 - Immutable deployment hostnames, environment Alias routing, rollback, and cancellation.
 - Durable command receipts, Revision/container mappings, and Alias mappings in SQLite.
+- HMAC-authenticated, tenant-bound runtime-log tails with provider-side redaction and a bounded retained snapshot after cancellation.
 
 Git builds, arbitrary OCI images, configuration injection, and production multi-tenant execution are intentionally unavailable. Git commands return a safe failure until WP-011 supplies the isolated BuildKit proof of concept.
 

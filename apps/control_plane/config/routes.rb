@@ -11,6 +11,7 @@ Rails.application.routes.draw do
       resources :projects, only: :create
       post "services/:service_id/deployments" => "deployments#create"
       get "deployments/:deployment_id" => "deployments#show"
+      get "deployments/:deployment_id/logs" => "deployment_logs#index"
       post "deployments/:deployment_id/cancel" => "deployments#cancel"
       post "environments/:environment_id/promotions" => "environment_operations#promote"
       post "environments/:environment_id/rollbacks" => "environment_operations#rollback"
@@ -26,6 +27,19 @@ Rails.application.routes.draw do
       post "local-provider/commands/claim" => "local_provider_commands#claim"
       post "local-provider/commands/:event_id/finalize" => "local_provider_commands#finalize"
       post "local-provider/events" => "local_provider_events#create"
+    end
+  end
+
+  resources :organizations, only: [] do
+    resources :deployments, only: %i[index show] do
+      member do
+        get :live
+        get :download_logs
+        post :cancel, controller: :deployment_actions
+        post :redeploy, controller: :deployment_actions
+        post :promote, controller: :deployment_actions
+        post :rollback, controller: :deployment_actions
+      end
     end
   end
 

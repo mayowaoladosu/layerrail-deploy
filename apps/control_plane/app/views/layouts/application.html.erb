@@ -24,6 +24,15 @@
   </head>
 
   <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <% flash.each do |type, message| %>
+      <div class="flash-message flash-message-<%= type %>"
+        role="<%= type.to_s == "alert" ? "alert" : "status" %>"
+        tabindex="-1"
+        data-controller="focus">
+        <%= message %>
+      </div>
+    <% end %>
     <%= yield %>
   </body>
 </html>

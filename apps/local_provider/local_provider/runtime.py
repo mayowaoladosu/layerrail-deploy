@@ -33,6 +33,10 @@ class RuntimeInstance:
 
 
 class DockerRuntime:
+    MEMORY_BYTES = 256 * 1024 * 1024
+    NANO_CPUS = 500_000_000
+    PIDS_LIMIT = 128
+
     def __init__(
         self,
         *,
@@ -97,18 +101,47 @@ class DockerRuntime:
         if not container:
             return
         info = await container.show()
-        labels = info.get("Config", {}).get("Labels") or {}
-        if (
-            labels.get("com.layerrail.managed") != "true"
-            or labels.get("com.layerrail.deployment-id") != deployment_id
-            or labels.get("com.layerrail.organization-id") != organization_id
-        ):
-            raise RuntimeConflict("Existing runtime identity does not match")
+        self._verify_identity(
+            info,
+            deployment_id=deployment_id,
+            organization_id=organization_id,
+        )
         try:
             await container.delete(force=True)
         except DockerError as error:
             if error.status != 404:
                 raise RuntimeUnavailable("Docker container removal failed") from error
+
+    def resource_profile(self) -> dict[str, int]:
+        return {
+            "cpu_millicores": self.NANO_CPUS // 1_000_000,
+            "memory_bytes": self.MEMORY_BYTES,
+        }
+
+    async def logs(
+        self, *, deployment_id: str, organization_id: str, limit: int = 200
+    ) -> list[str]:
+        container = await self._find_container(f"lrail-runtime-{deployment_id}")
+        if not container:
+            raise RuntimeConflict("Managed runtime was not found")
+        info = await container.show()
+        self._verify_identity(
+            info,
+            deployment_id=deployment_id,
+            organization_id=organization_id,
+        )
+        try:
+            lines = await container.log(
+                stdout=True,
+                stderr=True,
+                timestamps=True,
+                tail=max(1, min(limit, 1000)),
+            )
+        except DockerError as error:
+            if error.status == 404:
+                raise RuntimeConflict("Managed runtime was not found") from error
+            raise RuntimeUnavailable("Docker log read failed") from error
+        return [str(line) for line in lines]
 
     async def _find_container(self, name: str):
         try:
@@ -196,7 +229,7 @@ class DockerRuntime:
                     ),
                     readiness_path,
                 ],
-                "Interval": 1_000_000_000,
+                "Interval": 5_000_000_000,
                 "Timeout": 2_000_000_000,
                 "Retries": 30,
                 "StartPeriod": 1_000_000_000,
@@ -207,9 +240,9 @@ class DockerRuntime:
                 "ReadonlyRootfs": True,
                 "CapDrop": ["ALL"],
                 "SecurityOpt": ["no-new-privileges:true"],
-                "Memory": 256 * 1024 * 1024,
-                "NanoCpus": 500_000_000,
-                "PidsLimit": 128,
+                "Memory": self.MEMORY_BYTES,
+                "NanoCpus": self.NANO_CPUS,
+                "PidsLimit": self.PIDS_LIMIT,
                 "Tmpfs": {"/tmp": "rw,noexec,nosuid,size=16777216"},
                 "NetworkMode": self._runtime_network,
                 "RestartPolicy": {"Name": "unless-stopped"},
@@ -237,6 +270,21 @@ class DockerRuntime:
             "com.layerrail.source-digest": source_digest,
         }
         if any(labels.get(key) != value for key, value in expected.items()):
+            raise RuntimeConflict("Existing runtime identity does not match")
+
+    def _verify_identity(
+        self,
+        info: dict[str, Any],
+        *,
+        deployment_id: str,
+        organization_id: str,
+    ) -> None:
+        labels = info.get("Config", {}).get("Labels") or {}
+        if (
+            labels.get("com.layerrail.managed") != "true"
+            or labels.get("com.layerrail.deployment-id") != deployment_id
+            or labels.get("com.layerrail.organization-id") != organization_id
+        ):
             raise RuntimeConflict("Existing runtime identity does not match")
 
     async def _wait_ready(self, *, name: str, path: str) -> None:

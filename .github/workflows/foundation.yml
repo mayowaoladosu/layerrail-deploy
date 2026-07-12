@@ -28,6 +28,15 @@ jobs:
             'POSTGRES_PASSWORD=buildkit-proof-not-used' \
             > data/.env
 
+      - name: Enable rootless user namespaces
+        run: |
+          if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          if [ "$(sysctl -n user.max_user_namespaces)" -eq 0 ]; then
+            sudo sysctl -w user.max_user_namespaces=16384
+          fi
+
       - name: Prove BuildKit isolation
         run: bash scripts/buildkit-isolation-e2e.sh
 

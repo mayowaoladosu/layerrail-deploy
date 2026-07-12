@@ -1,0 +1,123 @@
+<% preview_url = "#{ENV.fetch("CONTROL_PLANE_SCHEME", "http")}://#{Routing::Hostnames.immutable(@deployment)}" %>
+<% alias_url = @alias_record && "#{ENV.fetch("CONTROL_PLANE_SCHEME", "http")}://#{Routing::Hostnames.environment(@alias_record)}" %>
+
+<section id="deployment_live"
+  class="live-deployment"
+  aria-labelledby="live-status-heading"
+  aria-busy="false"
+  data-controller="live-status"
+  data-live-status-url-value="<%= live_organization_deployment_path(current_organization, @deployment, format: :turbo_stream) %>"
+  data-live-status-version-value="<%= @live_version %>"
+  data-live-status-active-value="<%= !@deployment.terminal? %>">
+  <div class="live-error" role="status" data-live-status-target="error" hidden>
+    Live updates paused. The saved deployment state is still shown; reconnecting automatically.
+  </div>
+
+  <header class="status-hero">
+    <div>
+      <p class="eyebrow">Persisted status</p>
+      <span class="live-refresh-label" aria-hidden="true">Checking for updates…</span>
+      <h2 id="live-status-heading">
+        <span class="status-pulse status-<%= deployment_status_tone(@deployment.status) %>" aria-hidden="true"></span>
+        <span role="status" aria-live="polite"><%= deployment_status_label(@deployment.status) %></span>
+      </h2>
+      <p>
+        <% if @deployment.terminal? %>
+          This outcome is saved. Refreshing or closing the page will not change it.
+        <% elsif @deployment.status.in?(%w[ready promoted superseded]) %>
+          This release state is saved. Runtime output continues to update while the revision is active.
+        <% else %>
+          Progress is saved in the control plane. This page updates while work continues.
+        <% end %>
+      </p>
+    </div>
+    <%= render "deployments/actions" %>
+  </header>
+
+  <% if @failure_transition %>
+    <% error = @failure_transition.error %>
+    <section class="failure-panel" aria-labelledby="failure-heading">
+      <p class="eyebrow">Structured failure</p>
+      <h3 id="failure-heading"><%= error["message"] || "The deployment could not complete." %></h3>
+      <p>This deployment did not reach a healthy revision. Correct the source or runtime issue, then redeploy.</p>
+      <dl>
+        <% if error["phase"] %><div><dt>Phase</dt><dd><%= error["phase"].humanize %></dd></div><% end %>
+        <% if error["code"] %><div><dt>Code</dt><dd><code><%= error["code"] %></code></dd></div><% end %>
+        <% if error["diagnostic_reference"] %><div><dt>Support reference</dt><dd><code><%= error["diagnostic_reference"] %></code></dd></div><% end %>
+      </dl>
+    </section>
+  <% end %>
+
+  <div class="detail-columns">
+    <section class="surface-card" aria-labelledby="urls-heading">
+      <p class="eyebrow">Routing</p>
+      <h3 id="urls-heading">Generated URLs</h3>
+      <div class="url-list">
+        <div>
+          <span>Immutable deployment</span>
+          <% if @revision && !@deployment.terminal? %>
+            <%= link_to preview_url, preview_url, target: "_blank", rel: "noopener", class: "url-link" %>
+          <% else %>
+            <code class="url-link"><%= preview_url %></code>
+            <small><%= @deployment.terminal? ? "No longer routed" : "Available after a candidate starts" %></small>
+          <% end %>
+        </div>
+        <% if alias_url %>
+          <div>
+            <span><%= @deployment.environment.name %> environment</span>
+            <%= link_to alias_url, alias_url, target: "_blank", rel: "noopener", class: "url-link" %>
+            <small><%= @serving ? "Points to this revision" : "Points to another ready revision" %></small>
+          </div>
+        <% else %>
+          <div class="partial-state">
+            <span>Environment URL</span>
+            <p>No revision has been promoted to this environment yet.</p>
+          </div>
+        <% end %>
+      </div>
+    </section>
+
+    <section class="surface-card" aria-labelledby="alias-heading">
+      <p class="eyebrow">Release pointer</p>
+      <h3 id="alias-heading">Current and previous</h3>
+      <% if @alias_record %>
+        <dl class="alias-list">
+          <div>
+            <dt>Current</dt>
+            <dd>
+              <%= link_to short_public_id(@alias_record.current_revision_id),
+                organization_deployment_path(current_organization, @alias_record.current_revision.deployment_id) %>
+              <span class="status-badge status-success">Ready</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Previous</dt>
+            <dd>
+              <% if @alias_record.previous_revision %>
+                <% previous_deployment = @alias_record.previous_revision.deployment %>
+                <%= link_to short_public_id(@alias_record.previous_revision_id),
+                  organization_deployment_path(current_organization, previous_deployment) %>
+                <% if previous_deployment.status.in?(Aliases::Promote::PROMOTABLE_DEPLOYMENT_STATUSES) %>
+                  <span class="status-badge status-muted">Rollback available</span>
+                <% else %>
+                  <span class="status-badge status-muted"><%= deployment_status_label(previous_deployment.status) %> · history only</span>
+                <% end %>
+              <% else %>
+                <span>None yet</span>
+              <% end %>
+            </dd>
+          </div>
+        </dl>
+      <% else %>
+        <div class="partial-state">
+          <p>No environment release exists yet. Promote this deployment after it reaches Ready.</p>
+        </div>
+      <% end %>
+    </section>
+  </div>
+
+  <div class="detail-columns detail-columns-wide">
+    <%= render "deployments/logs" %>
+    <%= render "deployments/timeline" %>
+  </div>
+</section>

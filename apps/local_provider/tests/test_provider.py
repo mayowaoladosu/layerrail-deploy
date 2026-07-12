@@ -10,9 +10,15 @@ import yaml
 
 from local_provider.authentication import RequestSigner
 from local_provider.contracts import Envelope, InvalidEnvelope
+from local_provider.logs import RuntimeLogFormatter
 from local_provider.processor import Processor
 from local_provider.routing import RouteWriter
-from local_provider.runtime import DockerRuntime, ReadinessFailed, RuntimeInstance
+from local_provider.runtime import (
+    DockerRuntime,
+    ReadinessFailed,
+    RuntimeConflict,
+    RuntimeInstance,
+)
 from local_provider.state import EventConflict, StateStore
 
 
@@ -50,6 +56,13 @@ class FakeRuntime:
     async def remove(self, *, deployment_id, organization_id):
         organization_id
         self.removals.append(deployment_id)
+
+    async def logs(self, *, deployment_id, organization_id, limit=200):
+        deployment_id, organization_id, limit
+        return ["2026-07-12T00:00:00Z sample runtime line\n"]
+
+    def resource_profile(self):
+        return {"cpu_millicores": 500, "memory_bytes": 268435456}
 
 
 class FakeControlPlane:
@@ -104,6 +117,59 @@ class ContractTests(unittest.TestCase):
                 timestamp=100,
             )
             self.assertNotEqual(first["X-Lrail-Signature"], second["X-Lrail-Signature"])
+            self.assertTrue(
+                signer.valid(
+                    method="POST",
+                    path="/commands",
+                    body=b"{}",
+                    headers=first,
+                    now=100,
+                )
+            )
+            self.assertFalse(
+                signer.valid(
+                    method="POST",
+                    path="/commands",
+                    body=b'{"changed":true}',
+                    headers=first,
+                    now=100,
+                )
+            )
+            self.assertFalse(
+                signer.valid(
+                    method="POST",
+                    path="/commands",
+                    body=b"{}",
+                    headers=first,
+                    now=161,
+                )
+            )
+
+    def test_runtime_log_entries_are_timestamped_bounded_and_redacted(self):
+        formatter = RuntimeLogFormatter()
+
+        entries, truncated = formatter.format(
+            [
+                "2026-07-12T00:00:00.123456789Z authorization: Bearer private "
+                "token=also-private request completed\n"
+            ]
+        )
+        entry = entries[0]
+
+        self.assertFalse(truncated)
+        self.assertEqual(entry["timestamp"], "2026-07-12T00:00:00.123456789Z")
+        self.assertEqual(entry["stream"], "runtime")
+        self.assertEqual(
+            entry["message"],
+            "authorization: [REDACTED] token=[REDACTED] request completed",
+        )
+        entries, _truncated = formatter.format(
+            [
+                "not-timestamped",
+                '2026-07-12T00:00:00Z sample-web 127.0.0.1 "GET /health HTTP/1.1" 200 -\n'
+            ]
+        )
+        self.assertEqual(entries, [])
 
 
 class StateTests(unittest.TestCase):
@@ -120,6 +186,32 @@ class StateTests(unittest.TestCase):
             value["data"]["expected_version"] = 1
             with self.assertRaises(EventConflict):
                 store.receive(value["event_id"], value)
+            store.save_runtime_logs(
+                deployment_id="deployment-1",
+                organization_id="organization-1",
+                entries=[
+                    {
+                        "timestamp": "2026-07-12T00:00:00Z",
+                        "stream": "runtime",
+                        "message": "redacted output",
+                    }
+                ],
+                truncated=False,
+            )
+            self.assertEqual(
+                store.runtime_logs(
+                    deployment_id="deployment-1",
+                    organization_id="organization-1",
+                )["entries"][0]["message"],
+                "redacted output",
+            )
+            with self.assertRaises(EventConflict):
+                store.save_runtime_logs(
+                    deployment_id="deployment-1",
+                    organization_id="foreign-organization",
+                    entries=[],
+                    truncated=False,
+                )
             store.close()
 
 
@@ -189,6 +281,10 @@ class ProcessorTests(unittest.IsolatedAsyncioTestCase):
             self.control_plane.callbacks[0]["event_id"],
             self.control_plane.callbacks[1]["event_id"],
         )
+        self.assertEqual(
+            self.control_plane.callbacks[0]["data"]["readiness"]["resources"],
+            {"cpu_millicores": 500, "memory_bytes": 268435456},
+        )
         revision = self.store.revision_for_deployment(command.data["deployment_id"])
         self.assertEqual(revision["revision_id"], "revision-1")
 
@@ -257,15 +353,16 @@ class ProcessorTests(unittest.IsolatedAsyncioTestCase):
     async def test_cancellation_removes_the_managed_runtime_and_calls_back(self):
         deployment = self.deployment_event()
         await self.processor.process(deployment)
-        cancellation = Envelope.parse(
-            event(
-                "deployment.cancellation.requested.v1",
-                {
-                    "deployment_id": deployment.data["deployment_id"],
-                    "expected_version": 8,
-                },
-            )
+        cancellation_value = event(
+            "deployment.cancellation.requested.v1",
+            {
+                "deployment_id": deployment.data["deployment_id"],
+                "expected_version": 8,
+            },
         )
+        for key in ("organization_id", "resource_id", "correlation_id"):
+            cancellation_value[key] = deployment.value[key]
+        cancellation = Envelope.parse(cancellation_value)
 
         result = await self.processor.process(cancellation)
 
@@ -275,6 +372,11 @@ class ProcessorTests(unittest.IsolatedAsyncioTestCase):
             self.control_plane.callbacks[-1]["event_type"],
             "deployment.runtime.canceled.v1",
         )
+        retained = self.store.runtime_logs(
+            deployment_id=deployment.data["deployment_id"],
+            organization_id=deployment.value["organization_id"],
+        )
+        self.assertEqual(retained["entries"][0]["message"], "sample runtime line")
 
 
 class RuntimeConfigurationTests(unittest.TestCase):
@@ -301,6 +403,72 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(
             config["HostConfig"]["SecurityOpt"], ["no-new-privileges:true"]
         )
+        self.assertEqual(
+            runtime.resource_profile(),
+            {"cpu_millicores": 500, "memory_bytes": 268435456},
+        )
+
+
+class RuntimeLogTests(unittest.IsolatedAsyncioTestCase):
+    class Container:
+        def __init__(self):
+            self.log_options = None
+
+        async def show(self):
+            return {
+                "Config": {
+                    "Labels": {
+                        "com.layerrail.managed": "true",
+                        "com.layerrail.deployment-id": "deployment-1",
+                        "com.layerrail.organization-id": "organization-1",
+                    }
+                }
+            }
+
+        async def log(self, **options):
+            self.log_options = options
+            return ["2026-07-12T00:00:00Z sample ready\n"]
+
+    class Containers:
+        def __init__(self, container):
+            self.container = container
+
+        async def get(self, _name):
+            return self.container
+
+    class Docker:
+        def __init__(self, container):
+            self.containers = RuntimeLogTests.Containers(container)
+
+    async def test_logs_are_bounded_and_require_matching_runtime_identity(self):
+        container = self.Container()
+        runtime = DockerRuntime(
+            docker=self.Docker(container),
+            runtime_network="devpush_local_runtime",
+            container_port=8000,
+        )
+
+        lines = await runtime.logs(
+            deployment_id="deployment-1",
+            organization_id="organization-1",
+            limit=500,
+        )
+
+        self.assertEqual(lines, ["2026-07-12T00:00:00Z sample ready\n"])
+        self.assertEqual(
+            container.log_options,
+            {
+                "stdout": True,
+                "stderr": True,
+                "timestamps": True,
+                "tail": 500,
+            },
+        )
+        with self.assertRaises(RuntimeConflict):
+            await runtime.logs(
+                deployment_id="deployment-1",
+                organization_id="foreign-organization",
+            )
 
 
 if __name__ == "__main__":

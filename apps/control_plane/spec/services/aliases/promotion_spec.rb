@@ -162,6 +162,46 @@ RSpec.describe "Alias promotion and rollback" do
     end.to raise_error(Pundit::NotAuthorizedError)
   end
 
+  it "rejects a ready Revision after its non-serving runtime is canceled" do
+    context, _project, environment, service, = create_deployment_domain(sequence: "alias-canceled")
+    first_deployment, first_revision = ready_revision(
+      context:,
+      service:,
+      environment:,
+      sequence: "alias-canceled-first"
+    )
+    Aliases::Promote.call(context:, revision: first_revision, alias_type: :environment, name: environment.slug)
+    second_deployment, second_revision = ready_revision(
+      context:,
+      service:,
+      environment:,
+      sequence: "alias-canceled-second"
+    )
+    Aliases::Promote.call(context:, revision: second_revision, alias_type: :environment, name: environment.slug)
+    Aliases::Rollback.call(
+      context:,
+      alias_record: Alias.find_by!(service:, environment:, alias_type: :environment),
+      revision: first_revision,
+      expected_lock_version: Alias.find_by!(service:, environment:, alias_type: :environment).lock_version
+    )
+    canceled = Deployments::Cancel.call(
+      context:,
+      deployment: second_deployment.reload,
+      expected_lock_version: second_deployment.reload.lock_version
+    ).deployment
+    advance_deployment(canceled, to: :canceled)
+
+    expect do
+      Aliases::Promote.call(
+        context:,
+        revision: second_revision,
+        alias_type: :environment,
+        name: environment.slug
+      )
+    end.to raise_error(Aliases::Promote::RevisionNotReady)
+    expect(first_deployment.reload.status).to eq("promoted")
+  end
+
   it "rejects a rollback command based on a stale alias version" do
     context, _project, environment, service, = create_deployment_domain(sequence: "rollback-stale-domain")
     _first_deployment, first_revision = ready_revision(

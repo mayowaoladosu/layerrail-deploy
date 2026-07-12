@@ -17,6 +17,10 @@ cleanup() {
   local code=$?
   trap - EXIT
   if declare -p COMPOSE_BASE >/dev/null 2>&1; then
+    if ((code != 0)); then
+      "${COMPOSE_BASE[@]}" --profile buildkit-poc logs --tail 200 \
+        buildkitd buildkit-control-plane-canary >&2 || true
+    fi
     "${COMPOSE_BASE[@]}" --profile buildkit-poc run --rm -T --no-deps \
       --entrypoint //bin/rm buildkit-client -f //proof/canary >/dev/null 2>&1 || true
     "${COMPOSE_BASE[@]}" --profile buildkit-poc stop \

@@ -1,6 +1,6 @@
 class ApplicationController < ActionController::Base
   include Pundit::Authorization
-  helper_method :current_principal
+  helper_method :current_principal, :current_organization
 
   # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
   allow_browser versions: :modern
@@ -28,6 +28,16 @@ class ApplicationController < ActionController::Base
   end
 
   def current_organization
-    nil
+    @current_organization
+  end
+
+  def web_authenticated?
+    current_principal && request.env["lrail.authentication_method"] == "cookie"
+  end
+
+  def require_web_session!
+    return if web_authenticated? && current_authentication_session
+
+    redirect_to auth_login_path, status: :see_other
   end
 end

@@ -1,4 +1,8 @@
 class DeploymentPolicy < ApplicationPolicy
+  def index?
+    context&.member?
+  end
+
   def create?
     system_of_selected_organization? || (member_of_selected_organization? && context.role?(:owner, :admin))
   end

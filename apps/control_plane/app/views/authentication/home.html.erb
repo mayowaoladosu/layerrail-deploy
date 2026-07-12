@@ -1,18 +1,12 @@
 <% content_for :title, "LayerRail Deploy" %>
 
-<header class="app-header">
-  <div>
-    <p class="eyebrow">LayerRail Deploy</p>
-    <strong>Control plane</strong>
-  </div>
-  <%= button_to "Sign out", auth_logout_path, method: :post, class: "text-button" %>
-</header>
+<%= render "shared/app_header" %>
 
-<main class="app-shell">
+<main id="main-content" class="app-shell">
   <section class="welcome-card">
     <p class="eyebrow">Authenticated session</p>
     <h1>Welcome, <%= current_principal.name %>.</h1>
-    <p>Your Rails control plane is ready. Deployment history and live provider status will appear here in the next UI slice.</p>
+    <p>Review persisted deployment phases, follow live runtime output, promote healthy revisions, and roll back without rebuilding.</p>
   </section>
 
   <section aria-labelledby="organizations-heading">
@@ -24,13 +18,13 @@
     <div class="organization-grid">
       <% if @organizations.any? %>
         <% @organizations.each do |organization| %>
-          <article class="organization-card">
+          <%= link_to organization_deployments_path(organization), class: "organization-card organization-card-link" do %>
             <span class="organization-avatar" aria-hidden="true"><%= organization.name.first.upcase %></span>
-            <div>
-              <h3><%= organization.name %></h3>
-              <p><%= pluralize(organization.projects.count, "project") %></p>
-            </div>
-          </article>
+            <span>
+              <strong><%= organization.name %></strong>
+              <span><%= pluralize(organization.projects.count, "project") %> · View deployments</span>
+            </span>
+          <% end %>
         <% end %>
       <% else %>
         <div class="empty-card">

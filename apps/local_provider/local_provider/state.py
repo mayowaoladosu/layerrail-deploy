@@ -64,6 +64,13 @@ class StateStore:
                     container_port INTEGER NOT NULL,
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+                CREATE TABLE IF NOT EXISTS runtime_logs (
+                    deployment_id TEXT PRIMARY KEY,
+                    organization_id TEXT NOT NULL,
+                    entries_json TEXT NOT NULL,
+                    truncated INTEGER NOT NULL CHECK (truncated IN (0, 1)),
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
                 """
             )
 
@@ -173,6 +180,55 @@ class StateStore:
             "SELECT * FROM aliases ORDER BY alias_id"
         ).fetchall()
         return [dict(row) for row in rows]
+
+    def save_runtime_logs(
+        self,
+        *,
+        deployment_id: str,
+        organization_id: str,
+        entries: list[dict[str, str]],
+        truncated: bool,
+    ) -> None:
+        payload = canonical_json(entries).decode()
+        if len(entries) > 200 or len(payload.encode()) > 1024 * 1024:
+            raise ValueError("runtime log snapshot is too large")
+        with self.transaction() as connection:
+            existing = connection.execute(
+                "SELECT organization_id FROM runtime_logs WHERE deployment_id = ?",
+                (deployment_id,),
+            ).fetchone()
+            if existing and existing["organization_id"] != organization_id:
+                raise EventConflict("runtime log tenant identity conflicts")
+            connection.execute(
+                """
+                INSERT INTO runtime_logs (
+                    deployment_id, organization_id, entries_json, truncated
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(deployment_id) DO UPDATE SET
+                    entries_json = excluded.entries_json,
+                    truncated = excluded.truncated,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (deployment_id, organization_id, payload, int(truncated)),
+            )
+
+    def runtime_logs(
+        self, *, deployment_id: str, organization_id: str
+    ) -> dict[str, Any] | None:
+        row = self._connection.execute(
+            """
+            SELECT entries_json, truncated
+            FROM runtime_logs
+            WHERE deployment_id = ? AND organization_id = ?
+            """,
+            (deployment_id, organization_id),
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "entries": json.loads(row["entries_json"]),
+            "truncated": bool(row["truncated"]),
+        }
 
     def remove_deployment(self, deployment_id: str) -> None:
         with self.transaction() as connection:

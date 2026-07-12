@@ -22,6 +22,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
+        if self.client_address[0] == "127.0.0.1" and self.path == "/health":
+            return
         print(f"sample-web {self.address_string()} {format % args}", flush=True)
 
 
