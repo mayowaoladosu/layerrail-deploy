@@ -1,0 +1,46 @@
+# frozen_string_literal: true
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+
+require "lrail_orchestrator"
+require "temporalio/client"
+
+class AbandonedDelivery < StandardError; end
+
+class AbandonFinalization
+  def initialize(client)
+    @client = client
+  end
+
+  def claim
+    @client.claim
+  end
+
+  def finalize(**)
+    raise AbandonedDelivery
+  end
+end
+
+begin
+  settings = LrailOrchestrator::Settings.from_env
+  signer = LrailOrchestrator::RequestSigner.new(settings.shared_secret_path)
+  control_plane = LrailOrchestrator::ControlPlaneClient.new(
+    base_url: settings.control_plane_url,
+    signer:,
+    host_header: settings.control_plane_host
+  )
+  temporal = Temporalio::Client.connect(
+    settings.temporal_address,
+    settings.temporal_namespace
+  )
+  bridge = LrailOrchestrator::Bridge.new(
+    temporal:,
+    control_plane: AbandonFinalization.new(control_plane),
+    task_queue: settings.task_queue,
+    poll_interval: settings.poll_interval
+  )
+  raise "no workflow command was available" unless bridge.run_once
+  raise "workflow command was unexpectedly finalized"
+rescue AbandonedDelivery
+  puts "Temporal accepted the workflow; Rails delivery remains leased"
+end

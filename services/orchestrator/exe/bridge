@@ -1,0 +1,30 @@
+# frozen_string_literal: true
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+
+require "lrail_orchestrator"
+require "temporalio/client"
+
+settings = LrailOrchestrator::Settings.from_env
+signer = LrailOrchestrator::RequestSigner.new(settings.shared_secret_path)
+control_plane = LrailOrchestrator::ControlPlaneClient.new(
+  base_url: settings.control_plane_url,
+  signer:,
+  host_header: settings.control_plane_host
+)
+temporal = Temporalio::Client.connect(
+  settings.temporal_address,
+  settings.temporal_namespace
+)
+bridge = LrailOrchestrator::Bridge.new(
+  temporal:,
+  control_plane:,
+  task_queue: settings.task_queue,
+  poll_interval: settings.poll_interval
+)
+%w[INT TERM].each { |signal| Signal.trap(signal) { bridge.stop } }
+
+if ENV["ORCHESTRATOR_BRIDGE_ONCE"] == "1"
+  exit(bridge.run_once ? 0 : 3)
+end
+bridge.run

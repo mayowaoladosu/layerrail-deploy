@@ -1,12 +1,13 @@
 module Internal
   module V1
-    class LocalProviderCommandsController < BaseController
-      before_action :require_local_mode!
-
+    class OrchestratorCommandsController < OrchestratorBaseController
       SUPPORTED_EVENT_TYPES = %w[
         deployment.requested.v1
         deployment.cancellation.requested.v1
-        alias.routing.requested.v1
+        deployment.build.completed.v1
+        deployment.runtime.ready.v1
+        deployment.runtime.failed.v1
+        deployment.runtime.canceled.v1
       ].freeze
       LEASE_DURATION = 5.minutes
 
@@ -51,12 +52,6 @@ module Internal
       end
 
       private
-
-      def require_local_mode!
-        return unless Orchestrator::Mode.temporal?
-
-        render json: { code: "provider_disabled", message: "Local provider command delivery is disabled" }, status: :conflict
-      end
 
       def delivery_result
         case params[:outcome]

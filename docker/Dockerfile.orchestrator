@@ -1,0 +1,39 @@
+FROM ruby:3.4.10-slim AS gems
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /service
+COPY services/orchestrator/Gemfile services/orchestrator/Gemfile.lock ./
+RUN bundle config set path /usr/local/bundle \
+    && bundle config set deployment true \
+    && bundle install
+
+FROM ruby:3.4.10-slim
+
+ARG APP_UID=10001
+ARG APP_GID=10001
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends adduser ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && if ! getent group "${APP_GID}" >/dev/null; then addgroup --gid "${APP_GID}" appgroup; fi \
+    && adduser --uid "${APP_UID}" --gid "${APP_GID}" --system --home /service appuser
+
+WORKDIR /service
+COPY --from=gems /usr/local/bundle /usr/local/bundle
+COPY services/orchestrator/Gemfile services/orchestrator/Gemfile.lock ./
+COPY services/orchestrator/lib ./lib
+COPY services/orchestrator/exe ./exe
+COPY services/orchestrator/spec ./spec
+COPY services/orchestrator/.rspec ./
+
+ENV BUNDLE_FROZEN=true \
+    BUNDLE_WITHOUT="" \
+    HOME=/tmp/home \
+    RUBYOPT="-W:deprecated" \
+    TMPDIR=/tmp
+
+USER 10001:10001
+CMD ["bundle", "exec", "ruby", "exe/worker"]

@@ -1,0 +1,8 @@
+{
+  "contract_version": 1,
+  "operation_id": "019b9a80-0000-7000-8000-000000000010",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+  "expected_version": 0,
+  "stage": "workflow_accepted"
+}

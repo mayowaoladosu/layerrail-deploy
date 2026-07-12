@@ -10,6 +10,19 @@ permissions:
   contents: read
 
 jobs:
+  orchestrator-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build orchestrator
+        run: docker build -f docker/Dockerfile.orchestrator -t lrail-orchestrator:test .
+
+      - name: Run orchestrator specs
+        run: docker run --rm --entrypoint bundle lrail-orchestrator:test exec rspec
+
   buildkit-isolation:
     runs-on: ubuntu-latest
     timeout-minutes: 15

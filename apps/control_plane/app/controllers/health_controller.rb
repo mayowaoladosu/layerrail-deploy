@@ -6,4 +6,10 @@ class HealthController < ApplicationController
   rescue ActiveRecord::ActiveRecordError
     render json: { status: "unavailable" }, status: :service_unavailable
   end
+
+  def orchestrator
+    return render json: { status: "misconfigured" }, status: :service_unavailable unless Orchestrator::Mode.temporal?
+
+    show
+  end
 end

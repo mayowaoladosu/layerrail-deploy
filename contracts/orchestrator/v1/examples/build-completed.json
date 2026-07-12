@@ -1,0 +1,12 @@
+{
+  "contract_version": 1,
+  "event_id": "019b9a80-0000-7000-8000-000000000020",
+  "operation_id": "019b9a80-0000-7000-8000-000000000021",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+  "expected_version": 1,
+  "message_type": "build.completed",
+  "build_id": "019b9a80-0000-7000-8000-000000000022",
+  "status": "completed",
+  "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

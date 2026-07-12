@@ -30,12 +30,15 @@ services:
       LOCAL_PROVIDER_URL: http://local-provider:9000
       CONTROL_PLANE_DATABASE: ${CONTROL_PLANE_DATABASE:-lrail_control_plane_development}
       CONTROL_PLANE_TEST_DATABASE: ${CONTROL_PLANE_TEST_DATABASE:-lrail_control_plane_test}
+      DEPLOYMENT_ORCHESTRATOR: ${DEPLOYMENT_ORCHESTRATOR:-local}
+      ORCHESTRATOR_SHARED_SECRET_FILE: /run/lrail-orchestrator-auth/secret
     ports:
       - "127.0.0.1:3001:3000"
     volumes:
       - ${APP_DIR:-..}/apps/control_plane:/rails
       - ${APP_DIR:-..}/contracts:/contracts:ro
       - local-provider-auth:/run/lrail-provider-auth:ro
+      - orchestrator-auth:/run/lrail-orchestrator-auth:ro
       - control-plane-log:/rails/log
       - control-plane-storage:/rails/storage
       - control-plane-tmp:/rails/tmp
@@ -47,7 +50,11 @@ services:
       - "traefik.http.services.control-plane.loadbalancer.server.port=3000"
       - "traefik.docker.network=devpush_default"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test:
+        [
+          "CMD-SHELL",
+          "if [ \"$$DEPLOYMENT_ORCHESTRATOR\" = temporal ]; then curl -f http://localhost:3000/health/orchestrator; else curl -f http://localhost:3000/health; fi",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -88,6 +95,125 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  orchestrator-auth-init:
+    profiles: ["phase2"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.orchestrator
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        umask 077
+        if [ ! -s /auth/secret ]; then
+          bundle exec ruby -rsecurerandom -e 'File.write("/auth/secret.tmp", SecureRandom.urlsafe_base64(48) + "\n")'
+          chown 10001:10001 /auth/secret.tmp
+          mv /auth/secret.tmp /auth/secret
+        fi
+        chmod 0444 /auth/secret
+    read_only: true
+    network_mode: none
+    volumes:
+      - orchestrator-auth:/auth
+
+  temporal:
+    profiles: ["phase2"]
+    image: temporalio/auto-setup@sha256:607d68caa111338d754771efb876c92dfcdae06d056e4530bb31cd0f37406e6a
+    restart: unless-stopped
+    depends_on:
+      pgsql:
+        condition: service_started
+    networks:
+      - internal
+    environment:
+      DB: postgres12_pgx
+      DB_PORT: 5432
+      POSTGRES_SEEDS: pgsql
+      POSTGRES_USER: ${POSTGRES_USER:-devpush-app}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:-}
+      DBNAME: lrail_temporal
+      VISIBILITY_DBNAME: lrail_temporal_visibility
+      DEFAULT_NAMESPACE: lrail-alpha
+      DEFAULT_NAMESPACE_RETENTION: 30d
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 512
+    healthcheck:
+      test: ["CMD-SHELL", "temporal operator cluster health --address \"$(hostname):7233\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  orchestrator-worker:
+    profiles: ["phase2"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.orchestrator
+    command: bundle exec ruby exe/worker
+    restart: unless-stopped
+    depends_on:
+      orchestrator-auth-init:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_healthy
+      control-plane:
+        condition: service_healthy
+    networks:
+      - internal
+    environment: &orchestrator-environment
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: lrail-alpha
+      TEMPORAL_TASK_QUEUE: lrail-deployments-v1
+      CONTROL_PLANE_URL: http://control-plane:3000
+      CONTROL_PLANE_HTTP_HOST: control.localhost
+      ORCHESTRATOR_SHARED_SECRET_FILE: /run/lrail-orchestrator-auth/secret
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=67108864,uid=10001,gid=10001
+    volumes:
+      - orchestrator-auth:/run/lrail-orchestrator-auth:ro
+
+  orchestrator-bridge:
+    profiles: ["phase2"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.orchestrator
+    command: bundle exec ruby exe/bridge
+    restart: unless-stopped
+    depends_on:
+      orchestrator-auth-init:
+        condition: service_completed_successfully
+      temporal:
+        condition: service_healthy
+      control-plane:
+        condition: service_healthy
+    networks:
+      - internal
+    environment:
+      <<: *orchestrator-environment
+      ORCHESTRATOR_POLL_INTERVAL: "0.5"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=33554432,uid=10001,gid=10001
+    volumes:
+      - orchestrator-auth:/run/lrail-orchestrator-auth:ro
 
   local-docker-proxy:
     image: tecnativa/docker-socket-proxy
@@ -227,6 +353,7 @@ volumes:
   control-plane-tmp:
   local-provider-auth:
   local-provider-state:
+  orchestrator-auth:
   buildkit-state:
   buildkit-socket:
 

@@ -1,0 +1,27 @@
+# frozen_string_literal: true
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+
+require "lrail_orchestrator"
+require "temporalio/client"
+require "temporalio/worker"
+
+settings = LrailOrchestrator::Settings.from_env
+signer = LrailOrchestrator::RequestSigner.new(settings.shared_secret_path)
+control_plane = LrailOrchestrator::ControlPlaneClient.new(
+  base_url: settings.control_plane_url,
+  signer:,
+  host_header: settings.control_plane_host
+)
+client = Temporalio::Client.connect(
+  settings.temporal_address,
+  settings.temporal_namespace
+)
+worker = Temporalio::Worker.new(
+  client:,
+  task_queue: settings.task_queue,
+  workflows: [LrailOrchestrator::Workflows::DeploymentWorkflow],
+  activities: [LrailOrchestrator::Activities::AcknowledgeWorkflow.new(control_plane)],
+  graceful_shutdown_period: 10
+)
+worker.run(shutdown_signals: %w[SIGINT SIGTERM])

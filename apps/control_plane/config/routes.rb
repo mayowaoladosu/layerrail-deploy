@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   root "home#index"
   get "health" => "health#show", as: :health
+  get "health/orchestrator" => "health#orchestrator"
 
   namespace :api, path: nil do
     namespace :v1, path: "v1" do
@@ -27,6 +28,9 @@ Rails.application.routes.draw do
       post "local-provider/commands/claim" => "local_provider_commands#claim"
       post "local-provider/commands/:event_id/finalize" => "local_provider_commands#finalize"
       post "local-provider/events" => "local_provider_events#create"
+      post "orchestrator/commands/claim" => "orchestrator_commands#claim"
+      post "orchestrator/commands/:event_id/finalize" => "orchestrator_commands#finalize"
+      post "orchestrator/operations" => "orchestrator_operations#create"
     end
   end
 

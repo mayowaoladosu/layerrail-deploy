@@ -1,0 +1,51 @@
+# frozen_string_literal: true
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+
+require "json"
+require "lrail_orchestrator"
+require "temporalio/client"
+
+settings = LrailOrchestrator::Settings.from_env
+deployment_id = ARGV.fetch(0)
+mode = ARGV.fetch(1, "state")
+expected_result_status = ARGV[2]
+raise "deployment ID is invalid" unless LrailOrchestrator::Contracts::UUID.match?(deployment_id)
+
+workflow_id = "deployment/#{deployment_id}"
+client = Temporalio::Client.connect(
+  settings.temporal_address,
+  settings.temporal_namespace
+)
+handle = client.workflow_handle(workflow_id)
+result = handle.result if mode == "result"
+if expected_result_status && result&.fetch("status") != expected_result_status
+  actual = result&.fetch("status", nil)
+  raise "workflow result was #{actual.inspect}, expected #{expected_result_status}"
+end
+state = handle.query(
+  LrailOrchestrator::Workflows::DeploymentWorkflow.orchestration_state
+)
+history = handle.fetch_history.to_history_json
+forbidden = %w[
+  e2e-credential-secret example.invalid source_snapshot source_reference
+  runtime_policy readiness_path
+]
+leaked = forbidden.select { |value| history.include?(value) }
+raise "workflow history contains forbidden payload data: #{leaked.join(",")}" if leaked.any?
+raise "workflow history exceeds alpha bound" if history.bytesize > 1_048_576
+
+count = client.count_workflows("WorkflowId = '#{workflow_id}'").count
+raise "deterministic workflow created #{count} executions" unless count == 1
+
+description = handle.describe
+puts JSON.generate(
+  "workflow_id" => workflow_id,
+  "run_id" => description.run_id,
+  "status" => description.status.to_s,
+  "history_length" => description.history_length,
+  "history_bytes" => history.bytesize,
+  "execution_count" => count,
+  "state" => state,
+  "result" => result
+)

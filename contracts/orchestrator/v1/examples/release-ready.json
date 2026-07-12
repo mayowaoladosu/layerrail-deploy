@@ -1,0 +1,12 @@
+{
+  "contract_version": 1,
+  "event_id": "019b9a80-0000-7000-8000-000000000030",
+  "operation_id": "019b9a80-0000-7000-8000-000000000032",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+  "expected_version": 2,
+  "message_type": "release.ready",
+  "status": "ready",
+  "revision_id": "019b9a80-0000-7000-8000-000000000031",
+  "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+}

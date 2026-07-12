@@ -1,0 +1,10 @@
+{
+  "contract_version": 1,
+  "event_id": "019b9a80-0000-7000-8000-000000000040",
+  "operation_id": "019b9a80-0000-7000-8000-000000000040",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+  "expected_version": 3,
+  "message_type": "deployment.cancel",
+  "transition_id": "019b9a80-0000-7000-8000-000000000041"
+}

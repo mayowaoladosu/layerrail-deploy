@@ -1,0 +1,13 @@
+{
+  "contract_version": 1,
+  "event_id": "019b9a80-0000-7000-8000-000000000010",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+  "service_id": "019b9a80-0000-7000-8000-000000000011",
+  "environment_id": "019b9a80-0000-7000-8000-000000000012",
+  "configuration_snapshot_id": "019b9a80-0000-7000-8000-000000000013",
+  "source_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "workload_type": "web",
+  "expected_version": 0,
+  "operation_id": "019b9a80-0000-7000-8000-000000000010"
+}

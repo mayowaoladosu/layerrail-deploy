@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://layerrail.com/contracts/orchestrator/v1/workflow-message.schema.json",
+  "title": "LayerRail durable workflow message v1",
+  "oneOf": [
+    { "$ref": "#/$defs/deployment_input" },
+    { "$ref": "#/$defs/workflow_operation" },
+    { "$ref": "#/$defs/operation_result" },
+    { "$ref": "#/$defs/build_completed" },
+    { "$ref": "#/$defs/build_failed" },
+    { "$ref": "#/$defs/release_ready" },
+    { "$ref": "#/$defs/release_failed" },
+    { "$ref": "#/$defs/release_canceled" },
+    { "$ref": "#/$defs/cancellation" }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "signal_base": {
+      "type": "object",
+      "required": [
+        "contract_version", "event_id", "operation_id", "organization_id",
+        "deployment_id", "expected_version"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "event_id": { "$ref": "#/$defs/uuid" },
+        "operation_id": { "$ref": "#/$defs/uuid" },
+        "organization_id": { "$ref": "#/$defs/uuid" },
+        "deployment_id": { "$ref": "#/$defs/uuid" },
+        "expected_version": { "$ref": "#/$defs/version" }
+      }
+    },
+    "deployment_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "event_id",
+        "organization_id",
+        "deployment_id",
+        "service_id",
+        "environment_id",
+        "configuration_snapshot_id",
+        "source_digest",
+        "workload_type",
+        "expected_version",
+        "operation_id"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "event_id": { "$ref": "#/$defs/uuid" },
+        "organization_id": { "$ref": "#/$defs/uuid" },
+        "deployment_id": { "$ref": "#/$defs/uuid" },
+        "service_id": { "$ref": "#/$defs/uuid" },
+        "environment_id": { "$ref": "#/$defs/uuid" },
+        "configuration_snapshot_id": { "$ref": "#/$defs/uuid" },
+        "source_digest": { "$ref": "#/$defs/digest" },
+        "workload_type": { "enum": ["web", "static"] },
+        "expected_version": { "$ref": "#/$defs/version" },
+        "operation_id": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "workflow_operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "operation_id",
+        "organization_id",
+        "deployment_id",
+        "expected_version",
+        "stage"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "operation_id": { "$ref": "#/$defs/uuid" },
+        "organization_id": { "$ref": "#/$defs/uuid" },
+        "deployment_id": { "$ref": "#/$defs/uuid" },
+        "expected_version": { "$ref": "#/$defs/version" },
+        "stage": { "const": "workflow_accepted" }
+      }
+    },
+    "operation_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "accepted",
+        "stale",
+        "current_version",
+        "deployment_status"
+      ],
+      "properties": {
+        "operation_id": { "$ref": "#/$defs/uuid" },
+        "accepted": { "type": "boolean" },
+        "stale": { "type": "boolean" },
+        "current_version": { "$ref": "#/$defs/version" },
+        "deployment_status": {
+          "enum": [
+            "created", "queued", "preparing", "building", "scanning",
+            "deploying", "verifying", "ready", "failed", "canceling", "canceled"
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "accepted": { "const": true },
+            "stale": { "const": false }
+          }
+        },
+        {
+          "properties": {
+            "accepted": { "const": false },
+            "stale": { "const": true }
+          }
+        }
+      ]
+    },
+    "build_completed": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "contract_version", "event_id", "operation_id", "organization_id",
+        "deployment_id", "expected_version", "message_type", "build_id",
+        "status", "artifact_digest"
+      ],
+      "allOf": [
+        { "$ref": "#/$defs/signal_base" },
+        {
+          "properties": {
+            "message_type": { "const": "build.completed" },
+            "build_id": { "$ref": "#/$defs/uuid" },
+            "status": { "const": "completed" },
+            "artifact_digest": { "$ref": "#/$defs/digest" }
+          }
+        }
+      ]
+    },
+    "build_failed": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "contract_version", "event_id", "operation_id", "organization_id",
+        "deployment_id", "expected_version", "message_type", "build_id",
+        "status", "failure_code"
+      ],
+      "allOf": [
+        { "$ref": "#/$defs/signal_base" },
+        {
+          "properties": {
+            "message_type": { "const": "build.failed" },
+            "build_id": { "$ref": "#/$defs/uuid" },
+            "status": { "const": "failed" },
+            "failure_code": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }
+          }
+        }
+      ]
+    },
+    "release_ready": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "contract_version", "event_id", "operation_id", "organization_id",
+        "deployment_id", "expected_version", "message_type", "status",
+        "revision_id", "artifact_digest"
+      ],
+      "allOf": [
+        { "$ref": "#/$defs/signal_base" },
+        {
+          "properties": {
+            "message_type": { "const": "release.ready" },
+            "status": { "const": "ready" },
+            "revision_id": { "$ref": "#/$defs/uuid" },
+            "artifact_digest": { "$ref": "#/$defs/digest" }
+          }
+        }
+      ]
+    },
+    "release_failed": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "contract_version", "event_id", "operation_id", "organization_id",
+        "deployment_id", "expected_version", "message_type", "status",
+        "failure_code"
+      ],
+      "allOf": [
+        { "$ref": "#/$defs/signal_base" },
+        {
+          "properties": {
+            "message_type": { "const": "release.failed" },
+            "status": { "const": "failed" },
+            "failure_code": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }
+          }
+        }
+      ]
+    },
+    "release_canceled": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "contract_version", "event_id", "operation_id", "organization_id",
+        "deployment_id", "expected_version", "message_type", "status"
+      ],
+      "allOf": [
+        { "$ref": "#/$defs/signal_base" },
+        {
+          "properties": {
+            "message_type": { "const": "release.canceled" },
+            "status": { "const": "canceled" }
+          }
+        }
+      ]
+    },
+    "cancellation": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "contract_version", "event_id", "operation_id", "organization_id",
+        "deployment_id", "expected_version", "message_type", "transition_id"
+      ],
+      "allOf": [
+        { "$ref": "#/$defs/signal_base" },
+        {
+          "properties": {
+            "message_type": { "const": "deployment.cancel" },
+            "transition_id": { "$ref": "#/$defs/uuid" }
+          }
+        }
+      ]
+    }
+  }
+}
