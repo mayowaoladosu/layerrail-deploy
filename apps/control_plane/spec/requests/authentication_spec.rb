@@ -1,6 +1,10 @@
 require "rails_helper"
 
 RSpec.describe "Rodauth browser authentication", type: :request do
+  def github_configured?
+    ENV["GITHUB_APP_CLIENT_ID"].present? && ENV["GITHUB_APP_CLIENT_SECRET"].present?
+  end
+
   it "renders the legacy authentication design and redirects unauthenticated requests" do
     get "/"
     expect(response).to redirect_to("/auth/login")
@@ -11,20 +15,24 @@ RSpec.describe "Rodauth browser authentication", type: :request do
     expect(response.body).to include(
       "Sign in to LayerRail Deploy",
       "Continue with email",
-      "Continue with GitHub",
       "legacy-auth-main",
       "auth-site-logo"
     )
+    expect(response.body.include?("Continue with GitHub")).to eq(github_configured?)
     expect(response.body).not_to include("auth-brand", "Ship code without surrendering control")
   end
 
-  it "starts configured provider login through Rodauth OmniAuth" do
+  it "only exposes provider login when Rodauth has matching credentials" do
     post "/auth/github"
 
-    expect(response).to have_http_status(:redirect)
-    location = URI(response.location)
-    expect(location.host).to eq("github.com")
-    expect(location.path).to eq("/login/oauth/authorize")
+    if github_configured?
+      expect(response).to have_http_status(:redirect)
+      location = URI(response.location)
+      expect(location.host).to eq("github.com")
+      expect(location.path).to eq("/login/oauth/authorize")
+    else
+      expect(response).to have_http_status(:not_found)
+    end
   end
 
   it "uses one Rodauth email link to bootstrap and authenticate the first owner" do
