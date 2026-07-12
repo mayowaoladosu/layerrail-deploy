@@ -1,0 +1,20 @@
+{
+  "event_id": "019b9a80-0000-7000-8000-000000000041",
+  "event_type": "deployment.runtime.failed.v1",
+  "occurred_at": "2026-07-12T00:00:00Z",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "resource_id": "019b9a80-0000-7000-8000-000000000003",
+  "correlation_id": "019b9a80-0000-7000-8000-000000000004",
+  "idempotency_key": "local-provider:019b9a80-0000-7000-8000-000000000010:failed",
+  "producer": "local-provider",
+  "schema_version": 1,
+  "data": {
+    "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+    "operation_id": "019b9a80-0000-7000-8000-000000000010",
+    "expected_version": 0,
+    "phase": "runtime",
+    "code": "readiness_failed",
+    "message": "Sample application did not become ready",
+    "diagnostic_reference": "local-provider:readiness"
+  }
+}

@@ -120,13 +120,16 @@ module Api
       end
 
       def serialize_deployment(deployment)
+        revision = deployment.revisions.where(status: "ready").order(:created_at, :id).last
         {
           id: deployment.id,
           organization_id: deployment.organization_id,
           service_id: deployment.service_id,
+          environment_id: deployment.environment_id,
+          revision_id: revision&.id,
           status: deployment.status,
           source: deployment.source_snapshot,
-          preview_url: nil,
+          preview_url: "#{ENV.fetch("CONTROL_PLANE_SCHEME", "http")}://#{Routing::Hostnames.immutable(deployment)}",
           created_at: deployment.created_at.iso8601(6),
           updated_at: deployment.updated_at.iso8601(6)
         }

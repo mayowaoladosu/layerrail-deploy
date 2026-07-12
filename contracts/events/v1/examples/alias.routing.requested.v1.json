@@ -16,6 +16,9 @@
     "environment_id": "019b9a80-0000-7000-8000-000000000012",
     "current_revision_id": "019b9a80-0000-7000-8000-000000000032",
     "previous_revision_id": "019b9a80-0000-7000-8000-000000000033",
+    "current_deployment_id": "019b9a80-0000-7000-8000-000000000003",
+    "hostname": "sample-web-production.localhost",
+    "container_port": 8000,
     "expected_version": 2
   }
 }

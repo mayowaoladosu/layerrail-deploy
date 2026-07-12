@@ -1,0 +1,16 @@
+{
+  "event_id": "019b9a80-0000-7000-8000-000000000050",
+  "event_type": "deployment.cancellation.requested.v1",
+  "occurred_at": "2026-07-12T00:05:00Z",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "resource_id": "019b9a80-0000-7000-8000-000000000003",
+  "correlation_id": "019b9a80-0000-7000-8000-000000000004",
+  "idempotency_key": "deployment:019b9a80-0000-7000-8000-000000000003:cancellation:9",
+  "producer": "control-plane",
+  "schema_version": 1,
+  "data": {
+    "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+    "transition_id": "019b9a80-0000-7000-8000-000000000051",
+    "expected_version": 9
+  }
+}

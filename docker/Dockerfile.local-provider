@@ -1,0 +1,33 @@
+FROM python:3.13-slim
+
+ARG APP_UID=1000
+ARG APP_GID=1000
+
+# Install runtime helpers and the locked dependency installer
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl gosu \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /uvx /bin/
+
+# Create the non-root provider identity
+RUN if ! getent group "${APP_GID}" >/dev/null; then addgroup --gid "${APP_GID}" appgroup; fi \
+    && adduser --uid "${APP_UID}" --gid "${APP_GID}" --system --home /provider appuser
+
+WORKDIR /provider
+
+# Install only locked provider dependencies
+COPY apps/local_provider/pyproject.toml apps/local_provider/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY apps/local_provider/local_provider ./local_provider
+COPY apps/local_provider/tests ./tests
+COPY --chmod=0755 docker/entrypoint.local-provider.sh /entrypoint.local-provider.sh
+
+ENV PATH="/provider/.venv/bin:${PATH}" \
+    PYTHONPATH=/provider \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 9000
+ENTRYPOINT ["/entrypoint.local-provider.sh"]
+CMD ["python", "-m", "local_provider"]

@@ -122,6 +122,9 @@ module Aliases
           "environment_id" => alias_record.environment_id,
           "current_revision_id" => alias_record.current_revision_id,
           "previous_revision_id" => alias_record.previous_revision_id,
+          "current_deployment_id" => alias_record.current_revision.deployment_id,
+          "hostname" => Routing::Hostnames.environment(alias_record),
+          "container_port" => 8000,
           "expected_version" => alias_record.lock_version
         }
       )

@@ -34,6 +34,7 @@ services:
     volumes:
       - ${APP_DIR:-..}/apps/control_plane:/rails
       - ${APP_DIR:-..}/contracts:/contracts:ro
+      - local-provider-auth:/run/lrail-provider-auth:ro
       - control-plane-log:/rails/log
       - control-plane-storage:/rails/storage
       - control-plane-tmp:/rails/tmp
@@ -51,7 +52,77 @@ services:
       retries: 5
       start_period: 20s
 
+  local-provider:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.local-provider
+      args:
+        APP_UID: ${SERVICE_UID:-1000}
+        APP_GID: ${SERVICE_GID:-1000}
+    restart: unless-stopped
+    depends_on:
+      - control-plane
+      - local-docker-proxy
+    networks:
+      - internal
+      - local-runtime
+      - local-provider-docker
+    environment:
+      CONTROL_PLANE_URL: http://control-plane:3000
+      CONTROL_PLANE_HTTP_HOST: control.localhost
+      DOCKER_HOST: tcp://local-docker-proxy:2375
+      DEPLOY_DOMAIN: ${DEPLOY_DOMAIN:-localhost}
+      RUNTIME_NETWORK: devpush_local_runtime
+      LOCAL_PROVIDER_ALLOWED_IMAGE_REFERENCE: lrail-local-sample:dev
+      LOCAL_PROVIDER_STATE_DIR: /var/lib/lrail-provider
+      LOCAL_PROVIDER_ROUTES_DIR: /var/lib/lrail-routes
+      LOCAL_PROVIDER_SHARED_SECRET_FILE: /run/lrail-provider-auth/secret
+    volumes:
+      - local-provider-auth:/run/lrail-provider-auth
+      - local-provider-state:/var/lib/lrail-provider
+      - ${DATA_DIR:-../data}/traefik:/var/lib/lrail-routes
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  local-docker-proxy:
+    image: tecnativa/docker-socket-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${APP_DIR:-..}/docker/local-provider-proxy.cfg:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+    environment:
+      DISABLE_IPV6: "1"
+    networks:
+      - local-provider-docker
+
+  local-provider-sample:
+    profiles: ["samples"]
+    image: lrail-local-sample:dev
+    build:
+      context: ../samples/local-provider-web
+      dockerfile: Dockerfile
+    networks:
+      - local-runtime
+
+  traefik:
+    networks:
+      - local-runtime
+
 volumes:
   control-plane-log:
   control-plane-storage:
   control-plane-tmp:
+  local-provider-auth:
+  local-provider-state:
+
+networks:
+  local-provider-docker:
+    name: devpush_local_provider_docker
+    internal: true
+  local-runtime:
+    name: devpush_local_runtime
+    internal: true

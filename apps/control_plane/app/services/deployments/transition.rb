@@ -64,6 +64,7 @@ module Deployments
           occurred_at: Time.current
         )
         event = Deployments::PublishTransition.call(deployment: @deployment, transition:).event
+        Deployments::PublishCancellation.call(deployment: @deployment, transition:) if @to == "canceling"
       end
 
       Result.new(deployment: @deployment, transition:, event:)

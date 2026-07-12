@@ -21,7 +21,12 @@ RSpec.describe "Deployment transactional outbox" do
       "environment_id" => environment.id,
       "expected_version" => deployment.lock_version,
       "configuration_snapshot_id" => deployment.configuration_snapshot_id,
-      "source_digest" => deployment.source_digest
+      "source_digest" => deployment.source_digest,
+      "source" => deployment.source_snapshot,
+      "runtime_policy" => deployment.runtime_policy_snapshot,
+      "configuration_present" => false,
+      "immutable_hostname" => "d-#{deployment.id}.localhost",
+      "container_port" => 8000
     )
     expect(event.envelope.to_s).not_to include("payload_json", "token", "secret")
     expect(OutboxEvent.where(resource_id: deployment.id, event_type: "deployment.requested.v1").count).to eq(1)

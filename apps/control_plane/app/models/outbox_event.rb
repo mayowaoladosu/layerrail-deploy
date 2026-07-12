@@ -23,6 +23,7 @@ class OutboxEvent < ApplicationRecord
   before_destroy :prevent_destruction
 
   validates :resource_id, :correlation_id, format: { with: UUID_PATTERN }
+  validates :claim_request_id, format: { with: UUID_PATTERN }, allow_nil: true
   validates :event_type, format: { with: EVENT_TYPE_PATTERN }, length: { maximum: 255 }
   validates :idempotency_key,
     presence: true,
@@ -97,7 +98,7 @@ class OutboxEvent < ApplicationRecord
     when "pending"
       errors.add(:base, "Pending delivery cannot be claimed or published") if claim_token || locked_until || published_at
     when "delivering"
-      errors.add(:base, "Delivering event requires a lease") unless claim_token && locked_until && !published_at
+      errors.add(:base, "Delivering event requires a lease") unless claim_token && claim_request_id && locked_until && !published_at
     when "published"
       errors.add(:base, "Published event requires a timestamp") unless published_at && !claim_token && !locked_until
     when "dead"

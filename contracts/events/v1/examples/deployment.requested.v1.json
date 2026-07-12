@@ -14,6 +14,18 @@
     "environment_id": "019b9a80-0000-7000-8000-000000000012",
     "configuration_snapshot_id": "019b9a80-0000-7000-8000-000000000013",
     "source_digest": "8e785f6f5f35dbf8f6e6f08d517f56bf1822b4e225dc5f402f294bbf4e2f1c41",
+    "source": {
+      "type": "oci",
+      "reference": "lrail-local-sample:dev",
+      "digest": "sha256:8e785f6f5f35dbf8f6e6f08d517f56bf1822b4e225dc5f402f294bbf4e2f1c41"
+    },
+    "runtime_policy": {
+      "readiness_path": "/health"
+    },
+    "workload_type": "web",
+    "configuration_present": false,
+    "immutable_hostname": "d-019b9a80-0000-7000-8000-000000000003.localhost",
+    "container_port": 8000,
     "expected_version": 0,
     "trigger": "webhook"
   }

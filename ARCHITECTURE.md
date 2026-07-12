@@ -30,6 +30,16 @@ Phase 0 introduces a Rails control plane in `apps/control_plane/` beside the cur
 
 In development, `scripts/start.sh` includes `compose/control-plane.dev.yml`. Rails is available on `localhost:3001` and through Traefik at `control.localhost`. Its `/up` endpoint reports process liveness; `/health` verifies PostgreSQL readiness. The service runs as a non-root user and has writable Docker volumes only for logs, temporary data and local storage.
 
+### Local development provider
+
+WP-010 adds a separate Python process in `apps/local_provider/`. Rails writes provider-neutral desired-state commands to its transactional outbox. The provider claims only deployment, cancellation and Alias-routing commands through HMAC-authenticated internal HTTP endpoints, reconciles the local runtime, and sends versioned ready/failed/canceled callbacks. It does not import Rails code, connect to PostgreSQL or share Rails process memory. SQLite stores provider-side event receipts and runtime/route mappings for replay after crashes.
+
+The behavior-parity provider accepts only the repository-owned `lrail-local-sample:dev` image pinned to its exact local digest. Git builds, arbitrary OCI images and configuration injection fail closed until their isolated work packets are implemented. Successful runtimes expose immutable hostnames through validated Docker labels; environment aliases are rendered to one atomically replaced Traefik file. Cancellation removes only a container whose Deployment, organization and digest identity labels match.
+
+Docker access is isolated behind `local-docker-proxy` and an endpoint-level HAProxy allowlist. The provider can inspect/pull images and inspect/create/start/delete containers; build, exec, system and unrelated Docker APIs are denied. Rails has no socket mount or path to this proxy. Runtime containers use the internal `devpush_local_runtime` network and run as UID/GID 10001 with a read-only root filesystem, no new privileges, all capabilities dropped and bounded CPU, memory, PIDs and temporary storage. This is a trusted local harness, not the production multi-tenant sandbox.
+
+Run `scripts/local-provider-e2e.sh` to prove deploy, readiness, immutable routing, two promotions, rollback without a new Build, non-serving cancellation and the Docker isolation controls.
+
 ## File structure
 
 - `app/`: The main FastAPI application (see README file).
@@ -191,6 +201,8 @@ Notes:
 - `devpush_default`: public (Traefik, app, Loki).
 - `devpush_internal`: internal (DB, Redis, Docker proxy, Traefik file provider).
 - `devpush_runner`: runner network for deployed containers; Traefik and workers attach to route/probe.
+- `devpush_local_provider_docker`: internal WP-010 provider-to-constrained-Docker-proxy network; Rails is not attached.
+- `devpush_local_runtime`: internal WP-010 sample runtime network shared only by the provider, Traefik and managed sample containers.
 
 ## Observability
 

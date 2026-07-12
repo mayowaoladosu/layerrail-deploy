@@ -2,6 +2,7 @@ module Api
   module V1
     class DeploymentsController < BaseController
       rescue_from Deployments::Create::InvalidSource, with: :render_invalid_source
+      rescue_from Deployments::Cancel::InUse, with: :render_deployment_in_use
       rescue_from Deployments::Transition::InvalidTransition, with: :render_invalid_transition
       rescue_from Deployments::Transition::StaleTransition, with: :render_stale_transition
 
@@ -71,11 +72,9 @@ module Api
             "reason" => reason
           }
         ) do
-          result = Deployments::Transition.call(
+          result = Deployments::Cancel.call(
+            context: pundit_user,
             deployment:,
-            to: :canceling,
-            actor: current_principal,
-            cause: "cancellation_requested",
             expected_lock_version: deployment.lock_version
           )
 
@@ -139,6 +138,10 @@ module Api
 
       def render_stale_transition
         render_conflict("stale_resource", "The deployment changed before the operation completed")
+      end
+
+      def render_deployment_in_use
+        render_conflict("deployment_in_use", "A serving Deployment must be superseded before cancellation")
       end
     end
   end

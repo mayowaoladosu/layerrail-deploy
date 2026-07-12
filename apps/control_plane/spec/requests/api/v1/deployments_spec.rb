@@ -107,12 +107,14 @@ RSpec.describe "Deployment API", type: :request do
     expect(response.parsed_body).to include(
       "organization_id" => organization.id,
       "service_id" => service.id,
+      "environment_id" => environment.id,
+      "revision_id" => nil,
       "status" => "created",
       "source" => include(
         "commit_sha" => "a" * 40,
         "root_directory" => "apps/api"
       ),
-      "preview_url" => nil
+      "preview_url" => match(%r{\Ahttp://d-[0-9a-f-]+\.localhost\z})
     )
     deployment = Deployment.find(response.parsed_body.fetch("id"))
     expect(deployment.environment).to eq(environment)
@@ -307,5 +309,41 @@ RSpec.describe "Deployment API", type: :request do
     post_cancel(principal: owner, deployment:, key: "cancel-terminal")
     expect(response).to have_http_status(:conflict)
     expect(response.parsed_body.fetch("code")).to eq("invalid_transition")
+  end
+
+  it "rejects cancellation while the Deployment is serving an Alias" do
+    owner, _organization, context, project, service = create_domain(sequence: "cancel-serving")
+    environment = project.environments.find_by!(kind: :production)
+    deployment = create_deployment(context:, service:, key: "cancel-serving-target")
+    deployment = advance_deployment(deployment, to: :queued, actor: owner)
+    deployment = advance_deployment(deployment, to: :preparing, actor: owner)
+    build = Builds::Start.call(
+      deployment:,
+      idempotency_key: "cancel-serving-build",
+      expected_lock_version: deployment.lock_version
+    ).build
+    revision = Builds::Complete.call(
+      build:,
+      artifact_digest: "sha256:#{"e" * 64}",
+      evidence: { "scan_status" => "passed" },
+      region: "local",
+      cell: "development"
+    ).revision
+    revision = Revisions::MarkReady.call(
+      revision:,
+      readiness: { "status" => "passed" }
+    ).revision
+    Aliases::Promote.call(
+      context:,
+      revision:,
+      alias_type: :environment,
+      name: environment.slug
+    )
+
+    post_cancel(principal: owner, deployment:, key: "cancel-serving-operation")
+
+    expect(response).to have_http_status(:conflict)
+    expect(response.parsed_body.fetch("code")).to eq("deployment_in_use")
+    expect(deployment.reload.status).to eq("promoted")
   end
 end

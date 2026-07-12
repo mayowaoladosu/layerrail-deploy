@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_216000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_217000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -349,6 +349,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_216000) do
   create_table "outbox_events", id: :uuid, default: nil, force: :cascade do |t|
     t.integer "attempt_count", default: 0, null: false
     t.datetime "available_at", null: false
+    t.uuid "claim_request_id"
     t.uuid "claim_token"
     t.uuid "correlation_id", null: false
     t.datetime "created_at", null: false
@@ -367,6 +368,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_216000) do
     t.integer "schema_version", default: 1, null: false
     t.string "status", limit: 32, default: "pending", null: false
     t.datetime "updated_at", null: false
+    t.index ["claim_request_id"], name: "index_outbox_events_on_claim_request_id", unique: true, where: "(claim_request_id IS NOT NULL)"
     t.index ["organization_id", "producer", "idempotency_key"], name: "index_outbox_events_on_producer_idempotency", unique: true
     t.index ["organization_id", "status", "created_at"], name: "idx_on_organization_id_status_created_at_1118c31bba"
     t.index ["organization_id"], name: "index_outbox_events_on_organization_id"
@@ -378,6 +380,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_216000) do
     t.check_constraint "jsonb_typeof(data) = 'object'::text", name: "outbox_events_data_object"
     t.check_constraint "producer::text ~ '^[a-z][a-z0-9-]*$'::text", name: "outbox_events_producer_format"
     t.check_constraint "schema_version = 1", name: "outbox_events_schema_version"
+    t.check_constraint "status::text <> 'delivering'::text OR claim_request_id IS NOT NULL", name: "outbox_events_delivering_request_present"
     t.check_constraint "status::text = 'pending'::text AND claim_token IS NULL AND locked_until IS NULL AND published_at IS NULL OR status::text = 'delivering'::text AND claim_token IS NOT NULL AND locked_until IS NOT NULL AND published_at IS NULL OR status::text = 'published'::text AND claim_token IS NULL AND locked_until IS NULL AND published_at IS NOT NULL OR status::text = 'dead'::text AND claim_token IS NULL AND locked_until IS NULL AND published_at IS NULL", name: "outbox_events_delivery_state_consistent"
     t.check_constraint "status::text = 'pending'::text OR status::text = 'delivering'::text OR status::text = 'published'::text OR status::text = 'dead'::text", name: "outbox_events_status_allowed"
   end

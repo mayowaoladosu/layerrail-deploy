@@ -11,6 +11,7 @@ docker/
 !docker/entrypoint.worker-monitor.sh
 !docker/entrypoint.worker-monitor.dev.sh
 !docker/entrypoint.control-plane.dev.sh
+!docker/entrypoint.local-provider.sh
 
 # Python
 __pycache__/

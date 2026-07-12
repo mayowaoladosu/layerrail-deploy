@@ -143,6 +143,12 @@ module Deployments
           "environment_id" => deployment.environment_id,
           "configuration_snapshot_id" => deployment.configuration_snapshot_id,
           "source_digest" => deployment.source_digest,
+          "source" => deployment.source_snapshot,
+          "runtime_policy" => deployment.runtime_policy_snapshot,
+          "workload_type" => deployment.build_settings_snapshot.fetch("workload_type"),
+          "configuration_present" => deployment.configuration_snapshot.key_summary.any?,
+          "immutable_hostname" => Routing::Hostnames.immutable(deployment),
+          "container_port" => 8000,
           "expected_version" => 0,
           "trigger" => deployment.trigger
         }

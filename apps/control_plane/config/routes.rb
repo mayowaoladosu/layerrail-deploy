@@ -21,6 +21,14 @@ Rails.application.routes.draw do
     resource :github, only: :create, controller: :github
   end
 
+  namespace :internal do
+    namespace :v1 do
+      post "local-provider/commands/claim" => "local_provider_commands#claim"
+      post "local-provider/commands/:event_id/finalize" => "local_provider_commands#finalize"
+      post "local-provider/events" => "local_provider_events#create"
+    end
+  end
+
   get "auth/login" => "authentication#login", as: :auth_login
   post "auth/login" => "authentication#create"
   get "auth/verify" => "authentication#verify", as: :auth_verify

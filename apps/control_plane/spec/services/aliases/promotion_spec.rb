@@ -87,6 +87,8 @@ RSpec.describe "Alias promotion and rollback" do
       "alias_id" => second.alias_record.id,
       "current_revision_id" => second_revision.id,
       "previous_revision_id" => first_revision.id,
+      "current_deployment_id" => second_revision.deployment_id,
+      "hostname" => Routing::Hostnames.environment(second.alias_record),
       "expected_version" => second.alias_record.lock_version
     )
   end

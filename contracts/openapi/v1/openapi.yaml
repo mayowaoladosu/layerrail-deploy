@@ -653,6 +653,14 @@ components:
           $ref: "#/components/schemas/PublicId"
         service_id:
           $ref: "#/components/schemas/PublicId"
+        environment_id:
+          $ref: "#/components/schemas/PublicId"
+        revision_id:
+          type: string
+          minLength: 8
+          maxLength: 64
+          pattern: "^[A-Za-z0-9][A-Za-z0-9_-]+$"
+          nullable: true
         status:
           type: string
           enum:
