@@ -1,0 +1,232 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: lrail-system
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: lrail-builds
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: lrail-runtime
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: lrail-system
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: lrail-builds
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: lrail-runtime
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-artifact-access
+  namespace: lrail-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: ["registry", "artifact-bucket-init", "artifact-gateway", "build-controller"]
+      ports:
+        - protocol: TCP
+          port: 9000
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-client-egress
+  namespace: lrail-system
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: ["registry", "artifact-bucket-init", "artifact-gateway", "build-controller"]
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: registry-token-access
+  namespace: lrail-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: registry-auth
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: ["lrail-builds", "lrail-runtime", "lrail-system"]
+        - ipBlock:
+            cidr: 10.0.0.0/8
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: registry-access
+  namespace: lrail-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: registry
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: ["lrail-builds", "lrail-runtime", "lrail-system"]
+        - ipBlock:
+            cidr: 10.0.0.0/8
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: build-public-https
+  namespace: lrail-builds
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: lrail-alpha-build
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 224.0.0.0/4
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: lrail-system
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: ["registry", "registry-auth"]
+      ports:
+        - protocol: TCP
+          port: 5000
+        - protocol: TCP
+          port: 8080

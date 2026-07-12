@@ -1,0 +1,26 @@
+FROM python:3.13-slim
+
+ARG APP_UID=10001
+ARG APP_GID=10001
+
+COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /uvx /bin/
+
+RUN if ! getent group "${APP_GID}" >/dev/null; then addgroup --gid "${APP_GID}" appgroup; fi \
+    && adduser --uid "${APP_UID}" --gid "${APP_GID}" --system --home /service appuser
+
+WORKDIR /service
+
+COPY services/registry_auth/pyproject.toml services/registry_auth/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY services/registry_auth/registry_auth ./registry_auth
+COPY services/registry_auth/tests ./tests
+
+ENV PATH="/service/.venv/bin:${PATH}" \
+    PYTHONPATH=/service \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+USER 10001:10001
+EXPOSE 8080
+CMD ["python", "-m", "registry_auth"]

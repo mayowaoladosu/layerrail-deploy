@@ -1,0 +1,13 @@
+[project]
+name = "lrail-registry-auth"
+version = "0.1.0"
+description = "Scoped OCI registry token service for the LayerRail alpha cell"
+requires-python = "==3.13.*"
+dependencies = [
+    "aiohttp==3.12.14",
+    "cryptography==49.0.0",
+    "PyJWT==2.13.0",
+]
+
+[dependency-groups]
+dev = []
