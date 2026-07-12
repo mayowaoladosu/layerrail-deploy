@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Isolated Kubernetes build controller for the LayerRail alpha cell"
 requires-python = "==3.13.*"
 dependencies = [
-    "aiohttp==3.12.14",
+    "aiohttp==3.14.1",
     "cryptography==49.0.0",
     "kubernetes-asyncio==33.3.0",
 ]
