@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://layerrail.com/contracts/provider/v1/artifact-provider.schema.json",
+  "title": "LayerRail artifact provider mapping v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "provider", "registry", "objects", "identity"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "provider": {
+      "enum": ["local", "google"]
+    },
+    "registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "repository_prefix"],
+      "properties": {
+        "kind": {
+          "enum": ["distribution", "gar"]
+        },
+        "endpoint": {
+          "type": "string",
+          "format": "uri"
+        },
+        "location": {
+          "type": "string",
+          "pattern": "^[a-z]+-[a-z]+[0-9]$"
+        },
+        "repository_prefix": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        }
+      }
+    },
+    "objects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "static", "evidence", "sources"],
+      "properties": {
+        "kind": {
+          "enum": ["s3", "gcs"]
+        },
+        "endpoint": {
+          "type": "string",
+          "format": "uri"
+        },
+        "static": {
+          "$ref": "#/$defs/bucket"
+        },
+        "evidence": {
+          "$ref": "#/$defs/bucket"
+        },
+        "sources": {
+          "$ref": "#/$defs/bucket"
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "principal"],
+      "properties": {
+        "kind": {
+          "enum": ["generated_kubernetes_secret", "gke_workload_identity"]
+        },
+        "principal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "provider": {
+            "const": "local"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "registry": {
+            "required": ["endpoint"],
+            "properties": {
+              "kind": {
+                "const": "distribution"
+              }
+            }
+          },
+          "objects": {
+            "required": ["endpoint"],
+            "properties": {
+              "kind": {
+                "const": "s3"
+              }
+            }
+          },
+          "identity": {
+            "properties": {
+              "kind": {
+                "const": "generated_kubernetes_secret"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "registry": {
+            "required": ["location"],
+            "properties": {
+              "kind": {
+                "const": "gar"
+              }
+            }
+          },
+          "objects": {
+            "properties": {
+              "kind": {
+                "const": "gcs"
+              }
+            }
+          },
+          "identity": {
+            "properties": {
+              "kind": {
+                "const": "gke_workload_identity"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "bucket": {
+      "type": "string",
+      "pattern": "^(?:s3|gs)://[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]$"
+    }
+  }
+}

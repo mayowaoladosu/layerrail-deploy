@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "provider": "local",
+  "registry": {
+    "kind": "distribution",
+    "endpoint": "http://registry.lrail-system.svc.cluster.local:5000",
+    "repository_prefix": "lrail"
+  },
+  "objects": {
+    "kind": "s3",
+    "endpoint": "http://minio.lrail-system.svc.cluster.local:9000",
+    "static": "s3://lrail-static",
+    "evidence": "s3://lrail-evidence",
+    "sources": "s3://lrail-sources"
+  },
+  "identity": {
+    "kind": "generated_kubernetes_secret",
+    "principal": "lrail-system/lrail-artifact-credentials"
+  }
+}

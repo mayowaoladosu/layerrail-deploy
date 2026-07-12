@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "provider": "google",
+  "registry": {
+    "kind": "gar",
+    "location": "us-central1",
+    "repository_prefix": "us-central1-docker.pkg.dev/lrail-alpha/runtime"
+  },
+  "objects": {
+    "kind": "gcs",
+    "static": "gs://lrail-alpha-static",
+    "evidence": "gs://lrail-alpha-evidence",
+    "sources": "gs://lrail-alpha-sources"
+  },
+  "identity": {
+    "kind": "gke_workload_identity",
+    "principal": "artifact-gateway@lrail-alpha.iam.gserviceaccount.com"
+  }
+}

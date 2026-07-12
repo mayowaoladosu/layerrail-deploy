@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://layerrail.com/contracts/provider/v1/static-artifact-manifest.schema.json",
+  "title": "LayerRail static artifact manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "organization_id",
+    "revision_id",
+    "created_at",
+    "archive",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "organization_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "revision_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "archive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "media_type", "size"],
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "media_type": {
+          "const": "application/x-tar"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 33554432
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "digest", "media_type", "size", "cache_control"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[^\\u0000-\\u001F\\u007F]+$"
+          },
+          "digest": {
+            "$ref": "#/$defs/digest"
+          },
+          "media_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16777216
+          },
+          "cache_control": {
+            "enum": [
+              "no-cache, must-revalidate",
+              "public, max-age=300",
+              "public, max-age=31536000, immutable"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

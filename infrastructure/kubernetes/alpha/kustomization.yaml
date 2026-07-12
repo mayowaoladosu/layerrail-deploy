@@ -4,4 +4,5 @@ resources:
   - namespaces.yaml
   - quotas.yaml
   - artifact-services.yaml
+  - artifact-gateway.yaml
   - network-policies.yaml

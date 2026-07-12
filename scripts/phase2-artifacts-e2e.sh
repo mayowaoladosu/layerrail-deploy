@@ -28,5 +28,7 @@ fi
 # Prove artifact isolation
 run_cmd "Proving scoped OCI publication and persistence..." \
   "$PYTHON_BIN" "$APP_DIR/services/registry_auth/tests/registry_e2e.py" --profile "$PROFILE"
+run_cmd "Proving immutable static artifacts and retention..." \
+  "$PYTHON_BIN" "$APP_DIR/services/artifact_gateway/tests/artifact_gateway_e2e.py" --profile "$PROFILE"
 
 printf "${GRN}Phase 2 artifact E2E passed.${NC}\n"

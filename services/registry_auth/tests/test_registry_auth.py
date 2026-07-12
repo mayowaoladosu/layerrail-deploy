@@ -157,6 +157,31 @@ class RegistryAuthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(denied.status, 403)
 
     async def test_admin_signature_replay_and_revocation(self):
+        replay_body = json.dumps(
+            {
+                "credential_id": str(uuid4()),
+                "username": "lr_" + uuid4().hex,
+                "password": "replay-password-" + "x" * 32,
+                "repository_prefix": "lrail/organization-a/",
+                "actions": ["pull"],
+                "expires_at": int(
+                    (datetime.now(timezone.utc) + timedelta(minutes=10)).timestamp()
+                ),
+            },
+            separators=(",", ":"),
+        ).encode()
+        replay_headers = self.admin_headers(
+            method="POST", path="/v1/credentials", body=replay_body
+        )
+        first = await self.client.post(
+            "/v1/credentials", data=replay_body, headers=replay_headers
+        )
+        self.assertEqual(first.status, 201)
+        replay = await self.client.post(
+            "/v1/credentials", data=replay_body, headers=replay_headers
+        )
+        self.assertEqual(replay.status, 401)
+
         credential, password = await self.register(actions=["pull"])
         path = f"/v1/credentials/{credential['credential_id']}"
         response = await self.client.delete(

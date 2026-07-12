@@ -15,7 +15,7 @@ class RequestAuthenticator:
     def __init__(self, secret_path: Path):
         secret = secret_path.read_bytes().strip()
         if not 32 <= len(secret) <= 4096:
-            raise ValueError("registry auth admin secret is invalid")
+            raise ValueError("artifact gateway admin secret is invalid")
         self._secret = secret
         self._seen: dict[str, int] = {}
         self._lock = threading.Lock()

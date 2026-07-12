@@ -75,7 +75,9 @@ ensure_cluster() {
 
 build_platform_images() {
   docker build -f "$APP_DIR/docker/Dockerfile.registry-auth" -t lrail-registry-auth:dev "$APP_DIR"
+  docker build -f "$APP_DIR/docker/Dockerfile.artifact-gateway" -t lrail-artifact-gateway:dev "$APP_DIR"
   minikube image load -p "$PROFILE" lrail-registry-auth:dev
+  minikube image load -p "$PROFILE" lrail-artifact-gateway:dev
 }
 
 ensure_secrets() {
@@ -117,6 +119,14 @@ ensure_secrets() {
     "${KUBECTL[@]}" create secret generic lrail-registry-http \
       -n lrail-system \
       --from-literal=http-secret="$registry_http_secret"
+  fi
+
+  if ! "${KUBECTL[@]}" get secret lrail-artifact-gateway-admin -n lrail-system >/dev/null 2>&1; then
+    local artifact_admin_secret
+    artifact_admin_secret="$($py -c 'import secrets; print(secrets.token_urlsafe(48))')"
+    "${KUBECTL[@]}" create secret generic lrail-artifact-gateway-admin \
+      -n lrail-system \
+      --from-literal=admin-secret="$artifact_admin_secret"
   fi
 
   if ! "${KUBECTL[@]}" get secret lrail-registry-auth-tls -n lrail-system >/dev/null 2>&1; then
@@ -161,9 +171,11 @@ apply_cell() {
   "${KUBECTL[@]}" delete job artifact-bucket-init -n lrail-system --ignore-not-found >/dev/null
   "${KUBECTL[@]}" apply -k "$APP_DIR/infrastructure/kubernetes/alpha"
   "${KUBECTL[@]}" rollout restart deployment/registry-auth -n lrail-system
+  "${KUBECTL[@]}" rollout restart deployment/artifact-gateway -n lrail-system
   "${KUBECTL[@]}" rollout status deployment/minio -n lrail-system --timeout=240s
   "${KUBECTL[@]}" wait --for=condition=Complete job/artifact-bucket-init -n lrail-system --timeout=240s
   "${KUBECTL[@]}" rollout status deployment/registry-auth -n lrail-system --timeout=240s
+  "${KUBECTL[@]}" rollout status deployment/artifact-gateway -n lrail-system --timeout=240s
   "${KUBECTL[@]}" rollout status deployment/registry -n lrail-system --timeout=240s
 }
 

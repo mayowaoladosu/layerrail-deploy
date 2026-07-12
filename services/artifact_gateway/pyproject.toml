@@ -1,0 +1,12 @@
+[project]
+name = "lrail-artifact-gateway"
+version = "0.1.0"
+description = "Immutable static artifact and evidence gateway for the LayerRail alpha cell"
+requires-python = "==3.13.*"
+dependencies = [
+    "aiohttp==3.12.14",
+    "minio==7.2.18",
+]
+
+[dependency-groups]
+dev = []
