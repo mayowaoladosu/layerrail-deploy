@@ -1,4 +1,5 @@
 class User < ApplicationRecord
+  has_many :authentication_sessions, dependent: :restrict_with_exception
   has_many :memberships, dependent: :restrict_with_exception
   has_many :organizations, through: :memberships
 

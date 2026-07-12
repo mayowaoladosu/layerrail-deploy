@@ -17,6 +17,9 @@ module Api
       private
 
       def current_principal
+        method = request.env["lrail.authentication_method"]
+        return if method && method != "bearer"
+
         principal = request.env["lrail.authenticated_principal"]
         principal if principal.is_a?(User) && principal.persisted?
       end

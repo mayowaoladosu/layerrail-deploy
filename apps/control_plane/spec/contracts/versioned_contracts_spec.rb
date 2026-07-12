@@ -13,6 +13,14 @@ RSpec.describe "Versioned contracts" do
   let(:event_example_paths) { contracts_root.join("events/v1/examples").glob("*.json").sort }
 
   describe "the public REST API" do
+    let(:authentication_operations) do
+      {
+        "/auth/challenges" => { "post" => "createLoginChallenge" },
+        "/auth/sessions" => { "post" => "createAuthenticationSession" },
+        "/auth/session" => { "delete" => "deleteAuthenticationSession" },
+        "/auth/me" => { "get" => "getCurrentIdentity" }
+      }
+    end
     let(:required_operations) do
       {
         "/organizations" => { "post" => "createOrganization" },
@@ -39,13 +47,23 @@ RSpec.describe "Versioned contracts" do
     it "preserves the minimum v1 operation surface" do
       contract = YAML.safe_load_file(openapi_path, aliases: true)
 
-      required_operations.each do |path, methods|
+      required_operations.merge(authentication_operations).each do |path, methods|
         methods.each do |method, operation_id|
           operation = contract.fetch("paths").fetch(path).fetch(method)
 
           expect(operation.fetch("operationId")).to eq(operation_id)
         end
       end
+    end
+
+    it "publishes public challenge exchange and bearer-protected identity operations" do
+      contract = YAML.safe_load_file(openapi_path, aliases: true)
+      paths = contract.fetch("paths")
+
+      expect(paths.fetch("/auth/challenges").fetch("post").fetch("security")).to eq([])
+      expect(paths.fetch("/auth/sessions").fetch("post").fetch("security")).to eq([])
+      expect(paths.fetch("/auth/session").fetch("delete")).not_to have_key("security")
+      expect(paths.fetch("/auth/me").fetch("get")).not_to have_key("security")
     end
 
     it "requires an idempotency key for every mutation" do

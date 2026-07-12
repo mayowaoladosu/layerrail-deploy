@@ -10,6 +10,7 @@ servers:
 security:
   - bearerAuth: []
 tags:
+  - name: Authentication
   - name: Organizations
   - name: Projects
   - name: Services
@@ -18,6 +19,88 @@ tags:
   - name: Domains
 
 paths:
+  /auth/challenges:
+    post:
+      tags: [Authentication]
+      summary: Request a one-time email login link
+      operationId: createLoginChallenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLoginChallengeRequest"
+      responses:
+        "202":
+          description: Challenge accepted without revealing account existence
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginChallengeAccepted"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /auth/sessions:
+    post:
+      tags: [Authentication]
+      summary: Exchange a one-time login challenge for an API bearer session
+      operationId: createAuthenticationSession
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAuthenticationSessionRequest"
+      responses:
+        "201":
+          description: Bearer session created
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticationResult"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /auth/session:
+    delete:
+      tags: [Authentication]
+      summary: Revoke the current API bearer session
+      operationId: deleteAuthenticationSession
+      responses:
+        "204":
+          description: Session revoked
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/CorrelationId"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get the current bearer identity and organizations
+      operationId: getCurrentIdentity
+      responses:
+        "200":
+          description: Current identity
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentIdentity"
+        default:
+          $ref: "#/components/responses/Error"
+
   /organizations:
     post:
       tags: [Organizations]
@@ -427,6 +510,65 @@ components:
           type: string
           format: date-time
 
+    User:
+      type: object
+      required: [id, email, name, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/PublicId"
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        created_at:
+          type: string
+          format: date-time
+
+    LoginChallengeAccepted:
+      type: object
+      required: [message, expires_in]
+      properties:
+        message:
+          type: string
+        expires_in:
+          type: integer
+          minimum: 1
+
+    AuthenticationResult:
+      type: object
+      required: [access_token, token_type, expires_at, user, organization]
+      properties:
+        access_token:
+          type: string
+          minLength: 32
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/User"
+        organization:
+          allOf:
+            - $ref: "#/components/schemas/Organization"
+          nullable: true
+
+    CurrentIdentity:
+      type: object
+      required: [user, organizations]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        organizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Organization"
+
     Project:
       type: object
       required: [id, organization_id, name, slug, created_at]
@@ -760,6 +902,26 @@ components:
         slug:
           type: string
           pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+
+    CreateLoginChallengeRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+
+    CreateAuthenticationSessionRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token:
+          type: string
+          minLength: 32
+          maxLength: 256
 
     CreateServiceRequest:
       type: object

@@ -1,8 +1,13 @@
 Rails.application.routes.draw do
+  root "authentication#home"
   get "health" => "health#show", as: :health
 
   namespace :api, path: nil do
     namespace :v1, path: "v1" do
+      post "auth/challenges" => "authentication#challenge"
+      post "auth/sessions" => "authentication#create"
+      delete "auth/session" => "authentication#destroy"
+      get "auth/me" => "authentication#show"
       resources :projects, only: :create
       post "services/:service_id/deployments" => "deployments#create"
       get "deployments/:deployment_id" => "deployments#show"
@@ -15,6 +20,13 @@ Rails.application.routes.draw do
   namespace :webhooks do
     resource :github, only: :create, controller: :github
   end
+
+  get "auth/login" => "authentication#login", as: :auth_login
+  post "auth/login" => "authentication#create"
+  get "auth/verify" => "authentication#verify", as: :auth_verify
+  get "auth/confirm" => "authentication#confirm", as: :auth_confirm
+  post "auth/verify" => "authentication#complete"
+  post "auth/logout" => "authentication#logout", as: :auth_logout
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

@@ -1,0 +1,15 @@
+<% content_for :title, "Confirm sign in · LayerRail Deploy" %>
+
+<main class="auth-shell auth-shell-centered">
+  <section class="auth-panel" aria-labelledby="confirm-heading">
+    <div class="auth-card">
+      <p class="eyebrow">One-time verification</p>
+      <h1 id="confirm-heading">Finish signing in</h1>
+      <p>Confirm this browser to consume the secure link. This prevents email security scanners from using it before you do.</p>
+
+      <%= form_with url: auth_verify_path, method: :post, class: "auth-form" do |form| %>
+        <%= form.submit "Confirm secure sign in" %>
+      <% end %>
+    </div>
+  </section>
+</main>

@@ -1,0 +1,43 @@
+<% content_for :title, "LayerRail Deploy" %>
+
+<header class="app-header">
+  <div>
+    <p class="eyebrow">LayerRail Deploy</p>
+    <strong>Control plane</strong>
+  </div>
+  <%= button_to "Sign out", auth_logout_path, method: :post, class: "text-button" %>
+</header>
+
+<main class="app-shell">
+  <section class="welcome-card">
+    <p class="eyebrow">Authenticated session</p>
+    <h1>Welcome, <%= current_principal.name %>.</h1>
+    <p>Your Rails control plane is ready. Deployment history and live provider status will appear here in the next UI slice.</p>
+  </section>
+
+  <section aria-labelledby="organizations-heading">
+    <div class="section-heading">
+      <p class="eyebrow">Tenancy</p>
+      <h2 id="organizations-heading">Organizations</h2>
+    </div>
+
+    <div class="organization-grid">
+      <% if @organizations.any? %>
+        <% @organizations.each do |organization| %>
+          <article class="organization-card">
+            <span class="organization-avatar" aria-hidden="true"><%= organization.name.first.upcase %></span>
+            <div>
+              <h3><%= organization.name %></h3>
+              <p><%= pluralize(organization.projects.count, "project") %></p>
+            </div>
+          </article>
+        <% end %>
+      <% else %>
+        <div class="empty-card">
+          <h3>No organization access yet</h3>
+          <p>An owner can add this identity when invitations ship.</p>
+        </div>
+      <% end %>
+    </div>
+  </section>
+</main>
