@@ -1,4 +1,5 @@
 require "active_support/core_ext/integer/time"
+require_relative "../email_delivery"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
@@ -31,21 +32,11 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
-  smtp_host = ENV["SMTP_HOST"].presence
-  if smtp_host
-    config.action_mailer.delivery_method = :smtp
-    config.action_mailer.smtp_settings = {
-      address: smtp_host,
-      port: ENV.fetch("SMTP_PORT", 587).to_i,
-      user_name: ENV["SMTP_USERNAME"].presence,
-      password: ENV["SMTP_PASSWORD"].presence,
-      authentication: ENV["SMTP_USERNAME"].present? ? :plain : nil,
-      enable_starttls_auto: true
-    }.compact
-  else
-    config.action_mailer.delivery_method = :file
-    config.action_mailer.file_settings = { location: Rails.root.join("tmp/mails") }
-  end
+  ControlPlane::EmailDelivery.configure(
+    config.action_mailer,
+    environment: :development,
+    root: Rails.root
+  )
   config.action_mailer.raise_delivery_errors = true
 
   # Make template changes take effect immediately.

@@ -24,6 +24,7 @@ gem "omniauth-github", "2.0.1"
 gem "omniauth-google-oauth2", "1.2.2"
 gem "rodauth-omniauth", "0.6.2"
 gem "rodauth-rails", "2.1.1"
+gem "resend", "1.6.0"
 gem "sequel-activerecord_connection", "2.0.1"
 gem "tilt", "2.8.0"
 

@@ -27,7 +27,7 @@ Pundit and `Membership` remain separate authorization concerns. A successful aut
 
 The Rails cookie is encrypted, HTTP-only, SameSite=Lax, secure in production and bounded by `AUTH_TOKEN_TTL_DAYS`. Rodauth checks the active-session whitelist on every request; a copied cookie cannot be reused after logout.
 
-Development writes mail to `tmp/mails` when SMTP is absent and exposes a development-only link from the check-email page. Production requires the configured SMTP and control-plane host.
+FastAPI and Rails share the same email-provider policy. Complete SMTP settings explicitly select SMTP; otherwise `RESEND_API_KEY` selects Resend. Development writes mail to `tmp/mails` only when neither provider is configured and exposes a development-only link from the check-email page. Production requires Resend or complete SMTP settings plus the configured control-plane host, and delivery failures remain visible to the login request.
 
 ## Provider flow
 

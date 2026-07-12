@@ -131,7 +131,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for codebase structure.
 | `DEPLOY_DOMAIN`                     | Domain for deployments (wildcard root). No default—set explicitly (e.g., `deploy.example.com`).                                          |
 | `LE_EMAIL`                          | Email for Let's Encrypt notifications.                                                                                                   |
 | `EMAIL_SENDER_ADDRESS`              | Email sender for invites/login.                                                                                                          |
-| `RESEND_API_KEY`                    | API key for [Resend](https://resend.com). Optional if SMTP is configured.                                                               |
+| `RESEND_API_KEY`                    | API key for [Resend](https://resend.com), used by both FastAPI and Rails. Optional if complete SMTP settings are configured.             |
 | `SMTP_HOST`                         | SMTP host. When set with username/password, SMTP is used instead of Resend.                                                             |
 | `SMTP_PORT`                         | SMTP port. Default: `587`.                                                                                                              |
 | `SMTP_USERNAME`                     | SMTP username. Required when using SMTP.                                                                                                |
