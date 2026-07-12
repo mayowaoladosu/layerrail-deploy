@@ -12,6 +12,8 @@ docker/
 !docker/entrypoint.worker-monitor.dev.sh
 !docker/entrypoint.control-plane.dev.sh
 !docker/entrypoint.local-provider.sh
+!docker/buildkit/
+!docker/buildkit/capless-runc.py
 
 # Python
 __pycache__/

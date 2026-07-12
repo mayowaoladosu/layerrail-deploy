@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 from pathlib import Path
+import re
 import secrets
 import sqlite3
 import time
@@ -14,6 +15,12 @@ from typing import Iterator
 
 class CredentialConflict(ValueError):
     pass
+
+
+_EXACT_REPOSITORY = re.compile(
+    r"^lrail/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/"
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
 
 
 @dataclass(frozen=True)
@@ -176,12 +183,15 @@ class CredentialStore:
             raise ValueError("registry username is invalid")
         if len(password) < 32 or len(password) > 256:
             raise ValueError("registry password is invalid")
+        organization_prefix = (
+            repository_prefix.startswith("lrail/")
+            and repository_prefix.endswith("/")
+            and ".." not in repository_prefix
+        )
         if (
-            not repository_prefix.startswith("lrail/")
-            or not repository_prefix.endswith("/")
-            or ".." in repository_prefix
-            or len(repository_prefix) > 240
-        ):
+            not organization_prefix
+            and not _EXACT_REPOSITORY.fullmatch(repository_prefix)
+        ) or len(repository_prefix) > 240:
             raise ValueError("registry repository prefix is invalid")
         if not actions or any(action not in {"pull", "push"} for action in actions):
             raise ValueError("registry actions are invalid")

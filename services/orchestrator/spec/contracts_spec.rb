@@ -139,3 +139,80 @@ RSpec.describe LrailOrchestrator::Activities::AcknowledgeWorkflow do
       .to eq([operation.fetch("operation_id")])
   end
 end
+
+RSpec.describe LrailOrchestrator::Activities::PrepareBuild do
+  it "returns only the bounded build and revision identities" do
+    input = {
+      "contract_version" => 1,
+      "event_id" => "019b9a80-0000-7000-8000-000000000010",
+      "organization_id" => "019b9a80-0000-7000-8000-000000000002",
+      "deployment_id" => "019b9a80-0000-7000-8000-000000000003",
+      "service_id" => "019b9a80-0000-7000-8000-000000000011",
+      "environment_id" => "019b9a80-0000-7000-8000-000000000012",
+      "configuration_snapshot_id" => "019b9a80-0000-7000-8000-000000000013",
+      "source_digest" => "sha256:#{"a" * 64}",
+      "workload_type" => "web",
+      "expected_version" => 0,
+      "operation_id" => "019b9a80-0000-7000-8000-000000000010"
+    }
+    calls = []
+    control_plane = Object.new
+    control_plane.define_singleton_method(:prepare_build) do |value|
+      calls << value
+      {
+        "contract_version" => 1,
+        "operation_id" => value.fetch("operation_id"),
+        "organization_id" => value.fetch("organization_id"),
+        "deployment_id" => value.fetch("deployment_id"),
+        "accepted" => true,
+        "stale" => false,
+        "current_version" => 3,
+        "deployment_status" => "building",
+        "build_id" => "019b9a80-0000-7000-8000-000000000005",
+        "revision_id" => "019b9a80-0000-7000-8000-000000000006"
+      }
+    end
+
+    result = described_class.new(control_plane).execute(input)
+
+    expect(result).to include(
+      "current_version" => 3,
+      "deployment_status" => "building"
+    )
+    expect(JSON.generate(result)).not_to match(%r{https?://|password|secret|token})
+    expect(calls).to contain_exactly(input)
+  end
+end
+
+RSpec.describe LrailOrchestrator::Activities::RequestBuildCancellation do
+  it "reuses the cancellation operation while returning a sanitized result" do
+    signal = {
+      "contract_version" => 1,
+      "event_id" => "019b9a80-0000-7000-8000-000000000040",
+      "operation_id" => "019b9a80-0000-7000-8000-000000000040",
+      "organization_id" => "019b9a80-0000-7000-8000-000000000002",
+      "deployment_id" => "019b9a80-0000-7000-8000-000000000003",
+      "expected_version" => 4,
+      "message_type" => "deployment.cancel",
+      "transition_id" => "019b9a80-0000-7000-8000-000000000041"
+    }
+    control_plane = Object.new
+    control_plane.define_singleton_method(:cancel_build) do |value|
+      {
+        "operation_id" => value.fetch("operation_id"),
+        "accepted" => true,
+        "stale" => false,
+        "current_version" => value.fetch("expected_version"),
+        "deployment_status" => "canceling"
+      }
+    end
+
+    result = described_class.new(control_plane).execute(signal)
+
+    expect(result).to include(
+      "operation_id" => signal.fetch("operation_id"),
+      "accepted" => true,
+      "deployment_status" => "canceling"
+    )
+  end
+end

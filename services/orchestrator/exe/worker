@@ -21,7 +21,11 @@ worker = Temporalio::Worker.new(
   client:,
   task_queue: settings.task_queue,
   workflows: [LrailOrchestrator::Workflows::DeploymentWorkflow],
-  activities: [LrailOrchestrator::Activities::AcknowledgeWorkflow.new(control_plane)],
+  activities: [
+    LrailOrchestrator::Activities::AcknowledgeWorkflow.new(control_plane),
+    LrailOrchestrator::Activities::PrepareBuild.new(control_plane),
+    LrailOrchestrator::Activities::RequestBuildCancellation.new(control_plane)
+  ],
   graceful_shutdown_period: 10
 )
 worker.run(shutdown_signals: %w[SIGINT SIGTERM])

@@ -33,12 +33,22 @@ CMD_LOG="${TMPDIR:-/tmp}/devpush-cmd.$$.log"
 # Detect environment (production or development)
 ENVIRONMENT="${DEVPUSH_ENV:-}"
 if [[ -z "$ENVIRONMENT" ]]; then
-  if [[ "$(uname)" == "Darwin" ]]; then
-    ENVIRONMENT="development"
-  else
-    ENVIRONMENT="production"
-  fi
+  case "$(uname -s)" in
+    Darwin|MINGW*|MSYS*|CYGWIN*) ENVIRONMENT="development" ;;
+    *) ENVIRONMENT="production" ;;
+  esac
 fi
+
+# Expose common Windows development CLIs to Git Bash.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    [[ -d "/c/Program Files/Kubernetes/Minikube" ]] && \
+      PATH="/c/Program Files/Kubernetes/Minikube:$PATH"
+    [[ -d "/c/Program Files/Docker/Docker/resources/bin" ]] && \
+      PATH="/c/Program Files/Docker/Docker/resources/bin:$PATH"
+    export PATH
+    ;;
+esac
 
 # Application, data, log, and backup paths
 if [[ "$ENVIRONMENT" == "production" ]]; then

@@ -1,0 +1,250 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: build-controller
+  namespace: lrail-system
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: build-controller
+  namespace: lrail-builds
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "delete", "get"]
+  - apiGroups: ["batch"]
+    resources: ["jobs/status"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: build-controller
+  namespace: lrail-builds
+subjects:
+  - kind: ServiceAccount
+    name: build-controller
+    namespace: lrail-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: build-controller
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: build-controller-state
+  namespace: lrail-system
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: build-controller
+  namespace: lrail-system
+  labels:
+    app.kubernetes.io/name: build-controller
+    app.kubernetes.io/part-of: lrail-alpha
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: build-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: build-controller
+        app.kubernetes.io/part-of: lrail-alpha
+    spec:
+      serviceAccountName: build-controller
+      automountServiceAccountToken: true
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: trivy-db
+          image: lrail-build-controller:dev
+          imagePullPolicy: Never
+          command: ["/usr/local/bin/trivy"]
+          args:
+            - --cache-dir
+            - /var/lib/lrail-build-controller/trivy-cache
+            - --quiet
+            - image
+            - --download-db-only
+          env:
+            - name: TMPDIR
+              value: /var/lib/lrail-build-controller
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/lrail-build-controller
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: build-controller
+          image: lrail-build-controller:dev
+          imagePullPolicy: Never
+          env:
+            - name: BUILD_CONTROLLER_STATE_DIR
+              value: /var/lib/lrail-build-controller
+            - name: TMPDIR
+              value: /var/lib/lrail-build-controller
+            - name: BUILD_CONTROLLER_SHARED_SECRET_PATH
+              value: /run/lrail-build-controller/shared-secret
+            - name: BUILD_CONTROLLER_REGISTRY_ADMIN_SECRET_PATH
+              value: /run/lrail-build-controller/registry-admin-secret
+            - name: BUILD_CONTROLLER_ARTIFACT_ADMIN_SECRET_PATH
+              value: /run/lrail-build-controller/artifact-admin-secret
+            - name: BUILD_CONTROLLER_SIGNING_KEY_PATH
+              value: /run/lrail-build-controller/signing-key.pem
+            - name: BUILD_CONTROLLER_CONTROL_PLANE_URL
+              value: http://host.minikube.internal:3001
+            - name: BUILD_CONTROLLER_CONTROL_PLANE_HOST
+              value: control.localhost
+            - name: BUILD_CONTROLLER_REGISTRY_AUTH_URL
+              value: http://registry-auth.lrail-system.svc.cluster.local:8080
+            - name: BUILD_CONTROLLER_REGISTRY_SERVICE
+              value: lrail-alpha-registry
+            - name: BUILD_CONTROLLER_REGISTRY_ENDPOINT
+              value: registry.lrail-system.svc.cluster.local:5000
+            - name: BUILD_CONTROLLER_ARTIFACT_GATEWAY_URL
+              value: http://artifact-gateway.lrail-system.svc.cluster.local:8080
+            - name: BUILD_CONTROLLER_NAMESPACE
+              value: lrail-builds
+            - name: BUILD_CONTROLLER_WORKER_IMAGE
+              value: docker.io/library/lrail-build-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000
+            - name: BUILD_CONTROLLER_TRIVY_PATH
+              value: /usr/local/bin/trivy
+            - name: BUILD_CONTROLLER_HTTP_PORT
+              value: "8080"
+            - name: BUILD_CONTROLLER_BUILD_TIMEOUT_SECONDS
+              value: "900"
+            - name: BUILD_CONTROLLER_RESULT_GRACE_SECONDS
+              value: "15"
+            - name: BUILD_CONTROLLER_MAX_CRITICAL
+              value: "0"
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+              ephemeral-storage: 1Gi
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 3
+            timeoutSeconds: 2
+            failureThreshold: 40
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/lrail-build-controller
+            - name: credentials
+              mountPath: /run/lrail-build-controller
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: build-controller-state
+        - name: credentials
+          projected:
+            defaultMode: 0440
+            sources:
+              - secret:
+                  name: lrail-build-controller-auth
+                  items:
+                    - key: shared-secret
+                      path: shared-secret
+              - secret:
+                  name: lrail-registry-auth-admin
+                  items:
+                    - key: admin-secret
+                      path: registry-admin-secret
+              - secret:
+                  name: lrail-artifact-gateway-admin
+                  items:
+                    - key: admin-secret
+                      path: artifact-admin-secret
+              - secret:
+                  name: lrail-build-controller-signing
+                  items:
+                    - key: signing-key.pem
+                      path: signing-key.pem
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: build-controller
+  namespace: lrail-system
+spec:
+  selector:
+    app.kubernetes.io/name: build-controller
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

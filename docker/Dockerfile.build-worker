@@ -1,0 +1,12 @@
+ARG BUILDKIT_BASE=lrail-buildkit-gvisor:dev
+FROM ${BUILDKIT_BASE}
+
+WORKDIR /service
+
+COPY services/build_controller/build_controller ./build_controller
+
+ENV PYTHONPATH=/service \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python3", "-m", "build_controller.worker"]

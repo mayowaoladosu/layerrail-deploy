@@ -58,6 +58,14 @@ module LrailOrchestrator
       success_json(post("/internal/v1/orchestrator/operations", operation))
     end
 
+    def prepare_build(input)
+      success_json(post("/internal/v1/orchestrator/builds/prepare", input))
+    end
+
+    def cancel_build(signal)
+      success_json(post("/internal/v1/orchestrator/builds/cancel", signal))
+    end
+
     private
 
     def post(path, payload)

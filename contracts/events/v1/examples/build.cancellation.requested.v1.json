@@ -1,0 +1,20 @@
+{
+  "event_id": "019b9a80-0000-7000-8000-000000000051",
+  "event_type": "build.cancellation.requested.v1",
+  "occurred_at": "2026-07-12T12:05:00Z",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "resource_id": "019b9a80-0000-7000-8000-000000000005",
+  "correlation_id": "019b9a80-0000-7000-8000-000000000004",
+  "idempotency_key": "build:019b9a80-0000-7000-8000-000000000005:cancel",
+  "producer": "control-plane",
+  "schema_version": 1,
+  "data": {
+    "contract_version": 1,
+    "command_type": "build.cancel",
+    "operation_id": "019b9a80-0000-7000-8000-000000000040",
+    "organization_id": "019b9a80-0000-7000-8000-000000000002",
+    "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+    "build_id": "019b9a80-0000-7000-8000-000000000005",
+    "expected_version": 4
+  }
+}

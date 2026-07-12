@@ -1,0 +1,16 @@
+{
+  "contract_version": 1,
+  "operation_id": "019b9a80-0000-7000-8000-000000000010",
+  "build_id": "019b9a80-0000-7000-8000-000000000005",
+  "source_commit": "0123456789abcdef0123456789abcdef01234567",
+  "status": "completed",
+  "plan_type": "dockerfile_web",
+  "artifact_kind": "oci",
+  "artifact_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "image_reference": "registry.lrail-system.svc.cluster.local:5000/lrail/019b9a80-0000-7000-8000-000000000002/019b9a80-0000-7000-8000-000000000011@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "log_lines": [
+    "2026-07-12T12:00:00Z clone source commit 0123456",
+    "2026-07-12T12:00:01Z detect dockerfile_web",
+    "2026-07-12T12:00:02Z publish immutable image"
+  ]
+}

@@ -1,0 +1,91 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: lrail-build-job-boundary
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["batch"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["jobs"]
+  validations:
+    - expression: has(object.spec.activeDeadlineSeconds) && object.spec.activeDeadlineSeconds >= 60 && object.spec.activeDeadlineSeconds <= 3600
+      message: Build Jobs require a bounded active deadline.
+    - expression: has(object.spec.backoffLimit) && object.spec.backoffLimit <= 1
+      message: Build Jobs may retry at most once.
+    - expression: has(object.spec.ttlSecondsAfterFinished) && object.spec.ttlSecondsAfterFinished <= 600
+      message: Finished build sandboxes require prompt collection.
+    - expression: object.spec.template.spec.runtimeClassName == 'gvisor'
+      message: Build Jobs must use the gVisor RuntimeClass.
+    - expression: has(object.spec.template.spec.automountServiceAccountToken) && object.spec.template.spec.automountServiceAccountToken == false
+      message: Build Jobs must not mount a service-account token.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: lrail-build-job-boundary
+spec:
+  policyName: lrail-build-job-boundary
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: lrail-builds
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: lrail-build-pod-boundary
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: object.spec.runtimeClassName == 'gvisor'
+      message: Build Pods must use the gVisor RuntimeClass.
+    - expression: has(object.spec.automountServiceAccountToken) && object.spec.automountServiceAccountToken == false
+      message: Build Pods must not mount a service-account token.
+    - expression: (!has(object.spec.hostNetwork) || object.spec.hostNetwork == false) && (!has(object.spec.hostPID) || object.spec.hostPID == false) && (!has(object.spec.hostIPC) || object.spec.hostIPC == false)
+      message: Build Pods must not join host namespaces.
+    - expression: has(object.spec.securityContext) && object.spec.securityContext.runAsUser == 0 && object.spec.securityContext.runAsGroup == 0 && object.spec.securityContext.seccompProfile.type == 'RuntimeDefault'
+      message: The approved outer-root gVisor context and RuntimeDefault seccomp profile are required.
+    - expression: size(object.spec.containers) == 1 && object.spec.containers[0].name == 'worker' && object.spec.containers[0].image == 'docker.io/library/lrail-build-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000'
+      message: Alpha Build Pods may run only the approved worker image.
+    - expression: object.spec.containers.all(c, !has(c.command) && !has(c.args))
+      message: Build Pods must use the reviewed worker entrypoint.
+    - expression: (!has(object.spec.initContainers) || size(object.spec.initContainers) == 0) && (!has(object.spec.ephemeralContainers) || size(object.spec.ephemeralContainers) == 0)
+      message: Build Pods must not add init or ephemeral containers.
+    - expression: object.spec.volumes.all(v, has(v.secret) || has(v.emptyDir))
+      message: Build Pods may mount only expiring credentials and disposable storage.
+    - expression: object.spec.containers.all(c, has(c.securityContext) && c.securityContext.privileged == false && c.securityContext.allowPrivilegeEscalation == false && c.securityContext.readOnlyRootFilesystem == true)
+      message: Build containers must remain unprivileged, immutable and no-new-privileges.
+    - expression: object.spec.containers.all(c, c.securityContext.capabilities.drop.exists(cap, cap == 'ALL') && c.securityContext.capabilities.add.exists(cap, cap == 'SYS_ADMIN') && c.securityContext.capabilities.add.all(cap, cap in ['CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'FSETID', 'KILL', 'MKNOD', 'NET_BIND_SERVICE', 'SETFCAP', 'SETGID', 'SETPCAP', 'SETUID', 'SYS_ADMIN', 'SYS_CHROOT']))
+      message: Build containers may receive only the reviewed outer BuildKit capabilities.
+    - expression: object.spec.containers.all(c, (!has(c.env) || c.env.all(e, !has(e.valueFrom))) && (!has(c.envFrom) || size(c.envFrom) == 0))
+      message: Build credentials must not enter environment variables.
+    - expression: object.spec.containers.all(c, c.volumeMounts.all(v, !has(v.mountPropagation) || v.mountPropagation == 'None'))
+      message: Build containers must not propagate mounts to the host.
+    - expression: object.spec.containers.all(c, c.volumeMounts.all(m, !object.spec.volumes.exists(v, v.name == m.name && has(v.secret)) || (has(m.readOnly) && m.readOnly == true)))
+      message: Build credential Secrets must be mounted read-only.
+    - expression: object.spec.containers.all(c, !has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))
+      message: Build containers must not bind host ports.
+    - expression: object.spec.containers.all(c, has(c.resources) && has(c.resources.limits) && 'cpu' in c.resources.limits && 'memory' in c.resources.limits && 'ephemeral-storage' in c.resources.limits)
+      message: Build containers require CPU, memory and disk limits.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: lrail-build-pod-boundary
+spec:
+  policyName: lrail-build-pod-boundary
+  validationActions: ["Deny"]
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: lrail-builds

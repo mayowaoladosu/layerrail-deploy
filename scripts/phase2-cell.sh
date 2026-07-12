@@ -13,6 +13,8 @@ ACTION="${1:-start}"
 CONFIRM_DELETE="${2:-}"
 KUBECTL=(kubectl --context "$PROFILE")
 CELL_TEMP_DIR=""
+WORKER_IMAGE=""
+WORKER_IMAGE_PLACEHOLDER="docker.io/library/lrail-build-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 trap 'code=$?; [[ -n "${CELL_TEMP_DIR:-}" ]] && rm -rf "$CELL_TEMP_DIR"; if (( code != 0 )); then err "Command failed: ${BASH_COMMAND}"; [[ -f "$SCRIPT_ERR_LOG" ]] && cat "$SCRIPT_ERR_LOG" >&2; fi; exit "$code"' EXIT
 
@@ -76,8 +78,31 @@ ensure_cluster() {
 build_platform_images() {
   docker build -f "$APP_DIR/docker/Dockerfile.registry-auth" -t lrail-registry-auth:dev "$APP_DIR"
   docker build -f "$APP_DIR/docker/Dockerfile.artifact-gateway" -t lrail-artifact-gateway:dev "$APP_DIR"
-  minikube image load -p "$PROFILE" lrail-registry-auth:dev
-  minikube image load -p "$PROFILE" lrail-artifact-gateway:dev
+  docker build -f "$APP_DIR/docker/Dockerfile.buildkit-gvisor" -t lrail-buildkit-gvisor:dev "$APP_DIR"
+  docker build -f "$APP_DIR/docker/Dockerfile.build-worker" -t lrail-build-worker:dev "$APP_DIR"
+  docker build -f "$APP_DIR/docker/Dockerfile.build-controller" -t lrail-build-controller:dev "$APP_DIR"
+  minikube image load --overwrite=true -p "$PROFILE" lrail-registry-auth:dev
+  minikube image load --overwrite=true -p "$PROFILE" lrail-artifact-gateway:dev
+  minikube image load --overwrite=true -p "$PROFILE" lrail-build-worker:dev
+  minikube image load --overwrite=true -p "$PROFILE" lrail-build-controller:dev
+
+  local listing digest
+  listing="$(minikube ssh -p "$PROFILE" -- "sudo ctr -n k8s.io images list")"
+  digest="$(printf '%s\n' "$listing" | awk '
+    $1 == "docker.io/library/lrail-build-worker:dev" {
+      for (index = 1; index <= NF; index += 1) {
+        if ($index ~ /^sha256:[0-9a-f]{64}$/) { print $index; exit }
+      }
+    }
+  ')"
+  if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    err "Could not resolve the loaded build-worker image digest"
+    return 1
+  fi
+  WORKER_IMAGE="docker.io/library/lrail-build-worker@$digest"
+  minikube ssh -p "$PROFILE" -- \
+    "sudo ctr -n k8s.io images tag --force docker.io/library/lrail-build-worker:dev '$WORKER_IMAGE'" \
+    >/dev/null
 }
 
 ensure_secrets() {
@@ -86,6 +111,41 @@ ensure_secrets() {
   openssl="$(openssl_bin)"
   CELL_TEMP_DIR="$(mktemp -d)"
   chmod 0700 "$CELL_TEMP_DIR"
+
+  set_compose_base
+  local compose_phase2
+  compose_phase2=("${COMPOSE_BASE[@]}" --profile phase2)
+  if ! "${compose_phase2[@]}" exec -T control-plane \
+    cat /run/lrail-orchestrator-auth/secret \
+    >"$CELL_TEMP_DIR/shared-secret"; then
+    err "The Temporal control plane must be running before the build cell"
+    return 1
+  fi
+  chmod 0600 "$CELL_TEMP_DIR/shared-secret"
+  "$py" - "$CELL_TEMP_DIR/shared-secret" <<'PY'
+from pathlib import Path
+import sys
+
+value = Path(sys.argv[1]).read_bytes().strip()
+if not 32 <= len(value) <= 4096:
+    raise SystemExit("orchestrator shared secret is invalid")
+PY
+  "${KUBECTL[@]}" create secret generic lrail-build-controller-auth \
+    -n lrail-system \
+    --from-file=shared-secret="$CELL_TEMP_DIR/shared-secret" \
+    --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f - >/dev/null
+
+  if ! "${KUBECTL[@]}" get secret lrail-build-controller-signing \
+    -n lrail-system >/dev/null 2>&1; then
+    "$openssl" genpkey -algorithm ED25519 \
+      -out "$CELL_TEMP_DIR/signing-key.pem"
+    "$openssl" pkey -in "$CELL_TEMP_DIR/signing-key.pem" \
+      -check -noout >/dev/null
+    chmod 0600 "$CELL_TEMP_DIR/signing-key.pem"
+    "${KUBECTL[@]}" create secret generic lrail-build-controller-signing \
+      -n lrail-system \
+      --from-file=signing-key.pem="$CELL_TEMP_DIR/signing-key.pem"
+  fi
 
   if ! "${KUBECTL[@]}" get secret lrail-artifact-credentials -n lrail-system >/dev/null 2>&1; then
     local minio_user minio_password registry_access registry_secret artifact_access artifact_secret
@@ -147,10 +207,99 @@ ensure_secrets() {
   CELL_TEMP_DIR=""
 }
 
+apply_pinned_build_manifests() {
+  if [[ ! "$WORKER_IMAGE" =~ ^docker\.io/library/lrail-build-worker@sha256:[0-9a-f]{64}$ ]]; then
+    err "The immutable build-worker image was not resolved"
+    return 1
+  fi
+
+  local py render_dir
+  py="$(python_bin)"
+  render_dir="$(mktemp -d)"
+  CELL_TEMP_DIR="$render_dir"
+  WORKER_IMAGE="$WORKER_IMAGE" \
+    WORKER_IMAGE_PLACEHOLDER="$WORKER_IMAGE_PLACEHOLDER" \
+    "$py" - "$APP_DIR/infrastructure/kubernetes/alpha" "$render_dir" <<'PY'
+from pathlib import Path
+import os
+import sys
+
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+placeholder = os.environ["WORKER_IMAGE_PLACEHOLDER"]
+worker = os.environ["WORKER_IMAGE"]
+for name in ("build-controller.yaml", "build-sandbox-policy.yaml"):
+    value = (source / name).read_text(encoding="utf-8")
+    if placeholder not in value:
+        raise SystemExit(f"worker image placeholder is missing from {name}")
+    value = value.replace(placeholder, worker)
+    if placeholder in value:
+        raise SystemExit(f"worker image placeholder remained in {name}")
+    (target / name).write_text(value, encoding="utf-8", newline="\n")
+PY
+  "${KUBECTL[@]}" apply -f "$render_dir/build-sandbox-policy.yaml"
+  "${KUBECTL[@]}" apply -f "$render_dir/build-controller.yaml"
+  rm -rf "$render_dir"
+  CELL_TEMP_DIR=""
+}
+
+verify_admission_guard() {
+  local probe output
+  probe="$(mktemp)"
+  CELL_TEMP_DIR="$probe"
+  cat >"$probe" <<'YAML'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lrail-admission-readiness-probe
+  namespace: lrail-builds
+spec:
+  runtimeClassName: gvisor
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: probe
+      image: busybox:1.36
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+      resources:
+        limits:
+          cpu: 100m
+          memory: 32Mi
+          ephemeral-storage: 16Mi
+YAML
+  for _attempt in $(seq 1 60); do
+    if output="$("${KUBECTL[@]}" apply --dry-run=server -f "$probe" 2>&1)"; then
+      sleep 0.5
+      continue
+    fi
+    if grep -q "lrail-build-pod-boundary" <<<"$output"; then
+      rm -f "$probe"
+      CELL_TEMP_DIR=""
+      return 0
+    fi
+    sleep 0.5
+  done
+  rm -f "$probe"
+  CELL_TEMP_DIR=""
+  err "The fail-closed build admission policy did not become active"
+  return 1
+}
+
 configure_cell() {
   local cell_ip realm
   cell_ip="$(minikube ip -p "$PROFILE")"
-  realm="http://$cell_ip:30501/token"
+  realm="http://registry-auth.lrail-system.svc.cluster.local:8080/token"
   "${KUBECTL[@]}" create configmap alpha-cell-config \
     -n lrail-system \
     --from-literal=registry-endpoint="$cell_ip:30500" \
@@ -170,13 +319,22 @@ apply_cell() {
   configure_cell
   "${KUBECTL[@]}" delete job artifact-bucket-init -n lrail-system --ignore-not-found >/dev/null
   "${KUBECTL[@]}" apply -k "$APP_DIR/infrastructure/kubernetes/alpha"
+  apply_pinned_build_manifests
+  verify_admission_guard
+  "${KUBECTL[@]}" label namespace lrail-builds \
+    pod-security.kubernetes.io/enforce=privileged \
+    pod-security.kubernetes.io/enforce-version=latest \
+    --overwrite >/dev/null
+  "${KUBECTL[@]}" rollout restart deployment/registry -n lrail-system
   "${KUBECTL[@]}" rollout restart deployment/registry-auth -n lrail-system
   "${KUBECTL[@]}" rollout restart deployment/artifact-gateway -n lrail-system
+  "${KUBECTL[@]}" rollout restart deployment/build-controller -n lrail-system
   "${KUBECTL[@]}" rollout status deployment/minio -n lrail-system --timeout=240s
   "${KUBECTL[@]}" wait --for=condition=Complete job/artifact-bucket-init -n lrail-system --timeout=240s
   "${KUBECTL[@]}" rollout status deployment/registry-auth -n lrail-system --timeout=240s
   "${KUBECTL[@]}" rollout status deployment/artifact-gateway -n lrail-system --timeout=240s
   "${KUBECTL[@]}" rollout status deployment/registry -n lrail-system --timeout=240s
+  "${KUBECTL[@]}" rollout status deployment/build-controller -n lrail-system --timeout=360s
 }
 
 show_status() {

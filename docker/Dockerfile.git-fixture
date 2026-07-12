@@ -1,0 +1,35 @@
+FROM python:3.13-slim@sha256:eb43ff125d8d58d7449dcba7d336c23bcac412f526d861db493b9994d8010280
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git=1:2.47.3-0+deb13u1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY samples/build-controller /fixtures
+RUN set -eu; \
+    git config --global user.name "LayerRail E2E"; \
+    git config --global user.email "builds@layerrail.local"; \
+    mkdir -p /repos; \
+    for source in /fixtures/*; do \
+      [ -d "$source" ] || continue; \
+      name="$(basename "$source")"; \
+      work="/tmp/$name"; \
+      cp -a "$source" "$work"; \
+      git -C "$work" init --quiet; \
+      git -C "$work" add .; \
+      if git -C "$work" diff --cached --quiet; then rm -rf "$work"; continue; fi; \
+      GIT_AUTHOR_DATE='2026-07-12T00:00:00Z' GIT_COMMITTER_DATE='2026-07-12T00:00:00Z' \
+        git -C "$work" commit --quiet -m "LayerRail $name fixture"; \
+      git clone --quiet --bare "$work" "/repos/$name.git"; \
+      git -C "/repos/$name.git" config http.receivepack false; \
+      rm -rf "$work"; \
+    done; \
+    useradd --system --uid 10001 --home-dir /service fixture; \
+    chown -R 10001:10001 /repos
+
+WORKDIR /service
+COPY --chown=10001:10001 services/git_fixture/server.py ./server.py
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+USER 10001:10001
+EXPOSE 8080
+CMD ["python", "server.py"]

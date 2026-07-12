@@ -93,9 +93,14 @@ class TokenIssuer:
             raise ScopeDenied("registry scope is invalid")
         repository = parts[1]
         actions = sorted(set(filter(None, parts[2].split(","))))
+        repository_allowed = (
+            repository.startswith(credential.repository_prefix)
+            if credential.repository_prefix.endswith("/")
+            else repository == credential.repository_prefix
+        )
         if (
             not _REPOSITORY.fullmatch(repository)
-            or not repository.startswith(credential.repository_prefix)
+            or not repository_allowed
             or not actions
             or any(action not in credential.actions for action in actions)
         ):

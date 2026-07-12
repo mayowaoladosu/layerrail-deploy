@@ -5,21 +5,22 @@ module Builds
 
     Result = Data.define(:build, :deployment, :replayed)
 
-    def self.call(build:, error:, retryable:)
-      new(build:, error:, retryable:).call
+    def self.call(build:, error:, retryable:, evidence: {})
+      new(build:, error:, retryable:, evidence:).call
     end
 
-    def initialize(build:, error:, retryable:)
+    def initialize(build:, error:, retryable:, evidence:)
       @build = build
       @error = JSON.parse(JSON.generate(error))
       @retryable = retryable == true
+      @evidence = JSON.parse(JSON.generate(evidence))
     end
 
     def call
       ApplicationRecord.transaction(requires_new: true) do
         @build.lock!
         if @build.status == "failed"
-          expected_evidence = { "error" => @error, "retryable" => @retryable }
+          expected_evidence = failure_evidence
           raise FailureConflict unless @build.evidence == expected_evidence
 
           return Result.new(build: @build, deployment: @build.deployment, replayed: true)
@@ -28,7 +29,7 @@ module Builds
 
         @build.update!(
           status: :failed,
-          evidence: { "error" => @error, "retryable" => @retryable },
+          evidence: failure_evidence,
           finished_at: Time.current
         )
         deployment = @build.deployment
@@ -43,6 +44,12 @@ module Builds
 
         Result.new(build: @build, deployment:, replayed: false)
       end
+    end
+
+    private
+
+    def failure_evidence
+      @evidence.merge("error" => @error, "retryable" => @retryable)
     end
   end
 end

@@ -33,6 +33,8 @@ supervisord.pid
 # Node
 node_modules/
 package-lock.json
+!samples/build-controller/node-web/package-lock.json
+!samples/build-controller/generated-static/package-lock.json
 
 # Ruby
 .bundle/

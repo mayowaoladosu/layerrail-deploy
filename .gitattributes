@@ -4,6 +4,8 @@
 *.yaml text eol=lf
 *.erb text eol=lf
 *.js text eol=lf
+*.mjs text eol=lf
+*.py text eol=lf
 Dockerfile* text eol=lf
 Gemfile text eol=lf
 Gemfile.lock text eol=lf

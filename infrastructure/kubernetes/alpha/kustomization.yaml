@@ -1,8 +1,10 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - namespaces.yaml
   - quotas.yaml
   - artifact-services.yaml
   - artifact-gateway.yaml
+  - build-sandbox-policy.yaml
+  - build-controller.yaml
   - network-policies.yaml
+  - cilium-policies.yaml

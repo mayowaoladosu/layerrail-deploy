@@ -1,0 +1,29 @@
+FROM aquasec/trivy@sha256:086971aaf400beebd94e8300fd8ea623774419597169156cec56eec5b00dfb1e AS trivy
+
+FROM python:3.13-slim
+
+ARG APP_UID=10001
+ARG APP_GID=10001
+
+COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /uvx /bin/
+COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
+
+RUN if ! getent group "${APP_GID}" >/dev/null; then addgroup --gid "${APP_GID}" appgroup; fi \
+    && adduser --uid "${APP_UID}" --gid "${APP_GID}" --system --home /service appuser
+
+WORKDIR /service
+
+COPY services/build_controller/pyproject.toml services/build_controller/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY services/build_controller/build_controller ./build_controller
+COPY services/build_controller/tests ./tests
+
+ENV PATH="/service/.venv/bin:${PATH}" \
+    PYTHONPATH=/service \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+USER 10001:10001
+EXPOSE 8080
+CMD ["python", "-m", "build_controller"]

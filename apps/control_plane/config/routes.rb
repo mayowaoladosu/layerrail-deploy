@@ -32,6 +32,13 @@ Rails.application.routes.draw do
       post "orchestrator/commands/claim" => "orchestrator_commands#claim"
       post "orchestrator/commands/:event_id/finalize" => "orchestrator_commands#finalize"
       post "orchestrator/operations" => "orchestrator_operations#create"
+      post "orchestrator/builds/prepare" => "orchestrator_builds#prepare"
+      post "orchestrator/builds/cancel" => "orchestrator_builds#cancel"
+      post "build-controller/commands/claim" => "build_controller_commands#claim"
+      post "build-controller/commands/:event_id/finalize" => "build_controller_commands#finalize"
+      get "build-controller/builds/:build_id/credentials" => "build_controller_credentials#show"
+      post "build-controller/events" => "build_controller_events#create"
+      post "build-controller/cancellations" => "build_controller_cancellations#create"
     end
   end
 

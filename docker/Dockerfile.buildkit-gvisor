@@ -1,0 +1,7 @@
+FROM moby/buildkit:v0.26.2@sha256:de10faf919fc71ba4eb1dd7bd6449566d012b0c9436b1c61bfee21d621b009aa
+
+RUN apk add --no-cache python3=3.12.13-r0
+COPY --chmod=0755 docker/buildkit/capless-runc.py /usr/local/bin/capless-runc
+RUN sed -i 's/\r$//' /usr/local/bin/capless-runc
+
+ENTRYPOINT ["buildkitd"]

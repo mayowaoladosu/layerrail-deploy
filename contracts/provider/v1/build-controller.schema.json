@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://layerrail.com/contracts/provider/v1/build-controller.schema.json",
+  "title": "LayerRail build controller contract v1",
+  "oneOf": [
+    { "$ref": "#/$defs/build_command" },
+    { "$ref": "#/$defs/clone_credentials" },
+    { "$ref": "#/$defs/worker_result" },
+    { "$ref": "#/$defs/cancel_command" }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2147483647
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^lrail/[0-9a-f-]{36}/[0-9a-f-]{36}$",
+      "maxLength": 128
+    },
+    "build_command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version", "command_type", "operation_id", "organization_id",
+        "deployment_id", "build_id", "revision_id", "service_id",
+        "expected_version", "workload_type", "repository", "source_commit",
+        "source_root", "descriptor_digest"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "command_type": { "const": "build.start" },
+        "operation_id": { "$ref": "#/$defs/uuid" },
+        "organization_id": { "$ref": "#/$defs/uuid" },
+        "deployment_id": { "$ref": "#/$defs/uuid" },
+        "build_id": { "$ref": "#/$defs/uuid" },
+        "revision_id": { "$ref": "#/$defs/uuid" },
+        "service_id": { "$ref": "#/$defs/uuid" },
+        "expected_version": { "$ref": "#/$defs/version" },
+        "workload_type": { "enum": ["web", "static"] },
+        "repository": { "$ref": "#/$defs/repository" },
+        "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$" },
+        "source_root": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^(\\.|([A-Za-z0-9_-][A-Za-z0-9._-]*|\\.[A-Za-z0-9_-][A-Za-z0-9._-]*)(/([A-Za-z0-9_-][A-Za-z0-9._-]*|\\.[A-Za-z0-9_-][A-Za-z0-9._-]*))*)$"
+        },
+        "descriptor_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "clone_credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version", "build_id", "clone_url", "username", "secret",
+        "expires_at"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "build_id": { "$ref": "#/$defs/uuid" },
+        "clone_url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048,
+          "oneOf": [
+            { "pattern": "^https://[^\\s?#]+$" },
+            { "pattern": "^http://git-fixture\\.lrail-system\\.svc\\.cluster\\.local:8080/[^\\s?#]+$" }
+          ]
+        },
+        "username": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "secret": { "type": "string", "minLength": 1, "maxLength": 4096, "writeOnly": true },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "worker_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version", "operation_id", "build_id", "source_commit",
+        "status", "log_lines"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "operation_id": { "$ref": "#/$defs/uuid" },
+        "build_id": { "$ref": "#/$defs/uuid" },
+        "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$" },
+        "status": { "enum": ["completed", "failed"] },
+        "plan_type": { "enum": ["dockerfile_web", "node_web", "plain_static", "node_static"] },
+        "artifact_kind": { "enum": ["oci", "static"] },
+        "artifact_digest": { "$ref": "#/$defs/digest" },
+        "image_reference": { "type": "string", "maxLength": 512 },
+        "static_archive": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "maxLength": 46000000,
+          "writeOnly": true
+        },
+        "log_lines": {
+          "type": "array",
+          "maxItems": 1000,
+          "items": { "type": "string", "maxLength": 4096 }
+        },
+        "failure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase", "code", "message"],
+          "properties": {
+            "phase": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+            "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+            "message": { "type": "string", "minLength": 1, "maxLength": 500 }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "completed" } } },
+          "then": {
+            "required": ["plan_type", "artifact_kind", "artifact_digest"],
+            "oneOf": [
+              {
+                "properties": { "artifact_kind": { "const": "oci" } },
+                "required": ["image_reference"]
+              },
+              {
+                "properties": { "artifact_kind": { "const": "static" } },
+                "required": ["static_archive"]
+              }
+            ]
+          },
+          "else": { "required": ["failure"] }
+        }
+      ]
+    },
+    "cancel_command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version", "command_type", "operation_id", "organization_id",
+        "deployment_id", "build_id", "expected_version"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "command_type": { "const": "build.cancel" },
+        "operation_id": { "$ref": "#/$defs/uuid" },
+        "organization_id": { "$ref": "#/$defs/uuid" },
+        "deployment_id": { "$ref": "#/$defs/uuid" },
+        "build_id": { "$ref": "#/$defs/uuid" },
+        "expected_version": { "$ref": "#/$defs/version" }
+      }
+    }
+  }
+}

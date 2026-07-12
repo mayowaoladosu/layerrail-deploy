@@ -104,8 +104,28 @@ module DeploymentLogs
             identity: "build:#{build.id}:finished"
           )
         end
+        Array(build.evidence["log_tail"]).first(50).each_with_index do |line, index|
+          next unless line.is_a?(String) && line.bytesize.between?(1, 4096)
+
+          timestamp, message = build_log_line(line, fallback: build.finished_at || build.started_at)
+          entries << Entry.new(
+            timestamp:,
+            stream: "build",
+            level: runtime_level(message),
+            message:,
+            identity: "build:#{build.id}:log:#{index}"
+          )
+        end
         entries
       end
+    end
+
+    def build_log_line(line, fallback:)
+      timestamp_value, message = line.split(" ", 2)
+      timestamp = Time.iso8601(timestamp_value)
+      [ timestamp, message.to_s.presence || line ]
+    rescue ArgumentError
+      [ fallback, line ]
     end
 
     def runtime_entries

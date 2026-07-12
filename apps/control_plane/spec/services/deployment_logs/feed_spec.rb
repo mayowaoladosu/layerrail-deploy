@@ -71,6 +71,36 @@ RSpec.describe DeploymentLogs::Feed do
     )
   end
 
+  it "renders the controller's bounded redacted Build log tail" do
+    context, _project, _environment, _service, deployment = create_deployment_domain(sequence: "log-build-tail")
+    deployment = advance_deployment(deployment, to: :queued, actor: context.principal)
+    deployment = advance_deployment(deployment, to: :preparing)
+    build = Builds::Start.call(
+      deployment:,
+      idempotency_key: "log-build-tail",
+      expected_lock_version: deployment.lock_version
+    ).build
+    build.update!(
+      evidence: {
+        "log_tail" => [
+          "2026-07-12T12:00:00Z clone exact commit",
+          "2026-07-12T12:00:01Z build image"
+        ]
+      }
+    )
+
+    feed = described_class.call(
+      deployment: deployment.reload,
+      provider_result: provider_result(entries: [], status: :not_found),
+      limit: 100
+    )
+
+    expect(feed.entries).to include(
+      have_attributes(stream: "build", message: "clone exact commit"),
+      have_attributes(stream: "build", message: "build image")
+    )
+  end
+
   it "keeps persisted history visible beside a full runtime tail" do
     _context, _project, _environment, _service, deployment = create_deployment_domain(sequence: "log-history")
     runtime_entries = 120.times.map do |index|

@@ -6,6 +6,7 @@
     { "$ref": "#/$defs/deployment_input" },
     { "$ref": "#/$defs/workflow_operation" },
     { "$ref": "#/$defs/operation_result" },
+    { "$ref": "#/$defs/build_prepared" },
     { "$ref": "#/$defs/build_completed" },
     { "$ref": "#/$defs/build_failed" },
     { "$ref": "#/$defs/release_ready" },
@@ -128,6 +129,27 @@
           }
         }
       ]
+    },
+    "build_prepared": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version", "operation_id", "organization_id", "deployment_id",
+        "accepted", "stale", "current_version", "deployment_status",
+        "build_id", "revision_id"
+      ],
+      "properties": {
+        "contract_version": { "const": 1 },
+        "operation_id": { "$ref": "#/$defs/uuid" },
+        "organization_id": { "$ref": "#/$defs/uuid" },
+        "deployment_id": { "$ref": "#/$defs/uuid" },
+        "accepted": { "const": true },
+        "stale": { "const": false },
+        "current_version": { "$ref": "#/$defs/version" },
+        "deployment_status": { "const": "building" },
+        "build_id": { "$ref": "#/$defs/uuid" },
+        "revision_id": { "$ref": "#/$defs/uuid" }
+      }
     },
     "build_completed": {
       "type": "object",

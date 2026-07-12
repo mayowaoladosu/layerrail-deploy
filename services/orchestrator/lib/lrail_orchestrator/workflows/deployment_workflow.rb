@@ -25,6 +25,16 @@ module LrailOrchestrator
           return result("stale_observed")
         end
 
+        return terminal_result if terminal_signal?
+
+        prepared = prepare_build
+        @build_id = prepared.fetch("build_id")
+        @revision_id = prepared.fetch("revision_id")
+        @build_expected_version = prepared.fetch("current_version")
+        @expected_version = [ @expected_version, @build_expected_version ].max
+        validate_queued_signal(:build)
+        return terminal_result if terminal_signal?
+
         @state = "awaiting_build"
         Temporalio::Workflow.wait_condition { terminal_signal? || @build_signal }
         return terminal_result if terminal_signal?
@@ -36,6 +46,8 @@ module LrailOrchestrator
           )
         end
 
+        @artifact_digest = @build_signal.fetch("artifact_digest")
+        validate_queued_signal(:release)
         if @release_signal &&
             @release_signal.fetch("expected_version") < @build_signal.fetch("expected_version")
           @release_signal = nil
@@ -50,9 +62,9 @@ module LrailOrchestrator
           @state = "ready_observed"
           result(
             "ready_observed",
-            "build_id" => @build_signal.fetch("build_id"),
-            "revision_id" => @release_signal.fetch("revision_id"),
-            "artifact_digest" => @release_signal.fetch("artifact_digest")
+            "build_id" => @build_id,
+            "revision_id" => @revision_id,
+            "artifact_digest" => @artifact_digest
           )
         when "failed"
           @state = "failed"
@@ -66,7 +78,7 @@ module LrailOrchestrator
         end
       rescue Temporalio::Error::ActivityError
         @state = "failed"
-        result("failed_observed", "failure_code" => "workflow_acknowledgement_failed")
+        result("failed_observed", "failure_code" => "workflow_activity_failed")
       end
 
       workflow_signal
@@ -122,6 +134,23 @@ module LrailOrchestrator
         )
       end
 
+      def prepare_build
+        @state = "preparing_build"
+        Temporalio::Workflow.execute_activity(
+          Activities::PrepareBuild,
+          @input,
+          activity_id: "build/prepare/#{@input.fetch("operation_id")}",
+          schedule_to_close_timeout: 120,
+          start_to_close_timeout: 30,
+          retry_policy: Temporalio::RetryPolicy.new(
+            initial_interval: 1,
+            backoff_coefficient: 2.0,
+            max_interval: 15,
+            max_attempts: 5
+          )
+        )
+      end
+
       def accept_signal(slot, signal)
         return ignore_signal if signal.fetch("deployment_id") != @input.fetch("deployment_id")
         return ignore_signal if signal.fetch("organization_id") != @input.fetch("organization_id")
@@ -131,6 +160,7 @@ module LrailOrchestrator
           return
         end
         return ignore_signal if signal.fetch("expected_version") < minimum_version_for(slot)
+        return ignore_signal unless signal_identity_matches?(slot, signal)
 
         current = instance_variable_get("@#{slot}_signal")
         if current
@@ -138,21 +168,51 @@ module LrailOrchestrator
           return
         end
 
-        @expected_version = [@expected_version, signal.fetch("expected_version")].max
+        @expected_version = [ @expected_version, signal.fetch("expected_version") ].max
         @seen_signals[event_id] = signal
         instance_variable_set("@#{slot}_signal", signal)
+      end
+
+      def signal_identity_matches?(slot, signal)
+        case slot
+        when :build
+          return true unless @build_id
+
+          signal.fetch("operation_id") == @input.fetch("operation_id") &&
+            signal.fetch("build_id") == @build_id
+        when :release
+          return true unless signal.fetch("status") == "ready"
+          return true unless @revision_id && @artifact_digest
+
+          signal.fetch("revision_id") == @revision_id &&
+            signal.fetch("artifact_digest") == @artifact_digest
+        else
+          true
+        end
+      end
+
+      def validate_queued_signal(slot)
+        signal = instance_variable_get("@#{slot}_signal")
+        return unless signal
+        return if signal.fetch("expected_version") >= minimum_version_for(slot) &&
+          signal_identity_matches?(slot, signal)
+
+        instance_variable_set("@#{slot}_signal", nil)
+        ignore_signal
       end
 
       def minimum_version_for(slot)
         if slot == :release && @build_signal
           @build_signal.fetch("expected_version")
+        elsif slot == :build && @build_expected_version
+          @build_expected_version
         else
           @input.fetch("expected_version")
         end
       end
 
       def ignore_signal
-        @ignored_signal_count = [@ignored_signal_count + 1, 1_000].min
+        @ignored_signal_count = [ @ignored_signal_count + 1, 1_000 ].min
         nil
       end
 
@@ -162,6 +222,21 @@ module LrailOrchestrator
 
       def terminal_result
         if @cancellation_signal
+          @state = "canceling"
+          cancellation = Temporalio::Workflow.execute_activity(
+            Activities::RequestBuildCancellation,
+            @cancellation_signal,
+            activity_id: "build/cancel/#{@cancellation_signal.fetch("operation_id")}",
+            schedule_to_close_timeout: 120,
+            start_to_close_timeout: 30,
+            retry_policy: Temporalio::RetryPolicy.new(
+              initial_interval: 1,
+              backoff_coefficient: 2.0,
+              max_interval: 15,
+              max_attempts: 5
+            )
+          )
+          @expected_version = [ @expected_version, cancellation.fetch("current_version") ].max
           @state = "canceled"
           result("canceled_observed")
         else

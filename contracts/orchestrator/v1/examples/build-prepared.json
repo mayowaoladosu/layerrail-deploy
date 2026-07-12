@@ -1,0 +1,12 @@
+{
+  "contract_version": 1,
+  "operation_id": "019b9a80-0000-7000-8000-000000000010",
+  "organization_id": "019b9a80-0000-7000-8000-000000000002",
+  "deployment_id": "019b9a80-0000-7000-8000-000000000003",
+  "accepted": true,
+  "stale": false,
+  "current_version": 3,
+  "deployment_status": "building",
+  "build_id": "019b9a80-0000-7000-8000-000000000005",
+  "revision_id": "019b9a80-0000-7000-8000-000000000006"
+}

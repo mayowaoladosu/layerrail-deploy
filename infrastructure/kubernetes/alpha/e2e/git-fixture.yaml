@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git-fixture
+  namespace: lrail-system
+  labels:
+    app.kubernetes.io/name: git-fixture
+    app.kubernetes.io/part-of: lrail-alpha-e2e
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: git-fixture
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: git-fixture
+        app.kubernetes.io/part-of: lrail-alpha-e2e
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: git-fixture
+          image: lrail-git-fixture:dev
+          imagePullPolicy: Never
+          env:
+            - name: GIT_FIXTURE_USERNAME
+              value: fixture-user
+            - name: GIT_FIXTURE_PASSWORD_PATH
+              value: /run/lrail-git-fixture/password
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: credentials
+              mountPath: /run/lrail-git-fixture
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: credentials
+          secret:
+            secretName: lrail-git-fixture
+            defaultMode: 0440
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-fixture
+  namespace: lrail-system
+spec:
+  selector:
+    app.kubernetes.io/name: git-fixture
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: git-fixture-ingress
+  namespace: lrail-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: git-fixture
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: lrail-builds
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: build-worker
+      ports:
+        - protocol: TCP
+          port: 8080

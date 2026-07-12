@@ -152,6 +152,22 @@ module LrailOrchestrator
       bounded(value)
     end
 
+    def build_prepared(value)
+      value = object(value)
+      exact_keys!(value, %w[
+        contract_version operation_id organization_id deployment_id accepted
+        stale current_version deployment_status build_id revision_id
+      ])
+      invalid! unless value["contract_version"] == 1
+      %w[operation_id organization_id deployment_id build_id revision_id].each do |key|
+        uuid(value[key])
+      end
+      invalid! unless value["accepted"] == true && value["stale"] == false
+      version(value["current_version"])
+      invalid! unless value["deployment_status"] == "building"
+      bounded(value)
+    end
+
     def build_workflow_signal(value)
       value = object(value)
       status = value["status"]

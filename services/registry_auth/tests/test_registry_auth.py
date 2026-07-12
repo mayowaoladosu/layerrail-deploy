@@ -280,6 +280,33 @@ class CredentialStoreTests(unittest.TestCase):
                     scopes=["repository:lrail/org-a/service/../foreign:pull"],
                     now=1000,
                 )
+
+            organization_id = str(uuid4())
+            service_id = str(uuid4())
+            exact_repository = f"lrail/{organization_id}/{service_id}"
+            exact = store.register(
+                credential_id=str(uuid4()),
+                username="lr_" + uuid4().hex,
+                password="password-" + "y" * 32,
+                repository_prefix=exact_repository,
+                actions=["pull"],
+                expires_at=1300,
+                now=1000,
+            )
+            token = issuer.issue(
+                credential=exact,
+                service="service",
+                scopes=[f"repository:{exact_repository}:pull"],
+                now=1000,
+            )
+            self.assertIn("token", token)
+            with self.assertRaises(ScopeDenied):
+                issuer.issue(
+                    credential=exact,
+                    service="service",
+                    scopes=[f"repository:{exact_repository}-foreign:pull"],
+                    now=1000,
+                )
             store.close()
 
 

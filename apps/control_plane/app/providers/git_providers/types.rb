@@ -139,7 +139,21 @@ module GitProviders
       attr_reader :clone_url, :username, :expires_at
 
       def initialize(clone_url:, username:, secret:, expires_at:)
-        @clone_url = URI(clone_url.to_s).freeze
+        raw_url = clone_url.to_s
+        @clone_url = URI(raw_url)
+        local_fixture = @clone_url.is_a?(URI::HTTP) &&
+          !@clone_url.is_a?(URI::HTTPS) &&
+          @clone_url.host == "git-fixture.lrail-system.svc.cluster.local" &&
+          @clone_url.port == 8080
+        unless (@clone_url.is_a?(URI::HTTPS) || local_fixture) &&
+            @clone_url.host.present? &&
+            @clone_url.userinfo.nil? &&
+            @clone_url.query.nil? &&
+            @clone_url.fragment.nil? &&
+            raw_url.each_byte.none? { |byte| byte < 32 || byte == 127 }
+          raise ArgumentError, "clone URL is invalid"
+        end
+        @clone_url.freeze
         @username = username.to_s.dup.freeze
         @secret = secret.to_s.dup.freeze
         @expires_at = expires_at

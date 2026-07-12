@@ -107,7 +107,7 @@ spec:
             matchExpressions:
               - key: app.kubernetes.io/name
                 operator: In
-                values: ["registry", "artifact-bucket-init", "artifact-gateway", "build-controller"]
+                values: ["registry", "artifact-bucket-init", "artifact-gateway"]
       ports:
         - protocol: TCP
           port: 9000
@@ -130,7 +130,7 @@ spec:
     matchExpressions:
       - key: app.kubernetes.io/name
         operator: In
-        values: ["registry", "artifact-bucket-init", "artifact-gateway", "build-controller"]
+        values: ["registry", "artifact-bucket-init", "artifact-gateway"]
   policyTypes: ["Egress"]
   egress:
     - to:
@@ -215,7 +215,19 @@ spec:
               - 224.0.0.0/4
       ports:
         - protocol: TCP
+          port: 80
+        - protocol: TCP
           port: 443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: lrail-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: registry
+      ports:
+        - protocol: TCP
+          port: 5000
     - to:
         - namespaceSelector:
             matchLabels:
@@ -224,9 +236,93 @@ spec:
             matchExpressions:
               - key: app.kubernetes.io/name
                 operator: In
-                values: ["registry", "registry-auth"]
+                values: ["registry-auth", "build-controller"]
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: lrail-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: git-fixture
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: build-controller-ingress
+  namespace: lrail-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: build-controller
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: lrail-builds
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: build-worker
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: build-controller-dependencies
+  namespace: lrail-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: build-controller
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: ["registry-auth", "artifact-gateway"]
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: registry
       ports:
         - protocol: TCP
           port: 5000
+    - to:
+        - ipBlock:
+            cidr: 10.96.0.1/32
+      ports:
         - protocol: TCP
-          port: 8080
+          port: 443
+    - to:
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 3001
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8443
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 127.0.0.0/8
+              - 169.254.0.0/16
+              - 224.0.0.0/4
+      ports:
+        - protocol: TCP
+          port: 443

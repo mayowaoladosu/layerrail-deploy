@@ -33,6 +33,7 @@ services:
       CONTROL_PLANE_TEST_DATABASE: ${CONTROL_PLANE_TEST_DATABASE:-lrail_control_plane_test}
       DEPLOYMENT_ORCHESTRATOR: ${DEPLOYMENT_ORCHESTRATOR:-local}
       ORCHESTRATOR_SHARED_SECRET_FILE: /run/lrail-orchestrator-auth/secret
+      BUILD_CONTROLLER_E2E_PROVIDER_FILE: /rails/tmp/build-controller-e2e-provider.json
     ports:
       - "127.0.0.1:3001:3000"
     volumes:
