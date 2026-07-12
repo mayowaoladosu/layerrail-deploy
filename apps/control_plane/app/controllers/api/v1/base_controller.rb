@@ -17,11 +17,12 @@ module Api
       private
 
       def current_principal
-        method = request.env["lrail.authentication_method"]
-        return if method && method != "bearer"
+        injected = request.env["lrail.authenticated_principal"]
+        return injected if Rails.env.test? && injected.is_a?(User) && injected.persisted?
+        return unless rodauth.valid_jwt? && rodauth.logged_in?
 
-        principal = request.env["lrail.authenticated_principal"]
-        principal if principal.is_a?(User) && principal.persisted?
+        account = rodauth.rails_account
+        account if account.is_a?(User) && account.persisted?
       end
 
       def current_organization

@@ -4,44 +4,35 @@ module Api
       skip_before_action :authenticate_principal!, only: %i[challenge create]
       skip_before_action :select_organization!
 
-      rescue_from Authentication::Challenges::InvalidEmail, with: :render_invalid_email
-      rescue_from Authentication::Challenges::InvalidChallenge, with: :render_invalid_challenge
+      rescue_from Authentication::IdentityBootstrap::InvalidEmail, with: :render_invalid_email
+      rescue_from Authentication::RodauthSessions::InvalidToken, with: :render_invalid_challenge
 
       def challenge
-        issued = Authentication::Challenges.issue(
-          email: params[:email],
-          ip: request.remote_ip
-        )
-        if issued.challenge
-          AuthenticationMailer.with(challenge: issued.challenge).login_link.deliver_now
-          Authentication::Challenges.mark_delivered(issued.challenge)
+        email = Authentication::IdentityBootstrap.normalize_email(params[:email])
+        begin
+          RodauthApp.rodauth.email_auth_request(
+            login: email,
+            session: {},
+            env: { "REMOTE_ADDR" => request.remote_ip }
+          )
+        rescue Rodauth::InternalRequestError
+          nil
         end
 
         render json: {
           message: "If the address can sign in, a one-time link has been sent",
-          expires_in: Authentication::Challenges::DEFAULT_TTL.to_i
+          expires_in: RodauthMain::EMAIL_AUTH_TTL
         }, status: :accepted
       end
 
       def create
-        result = Authentication::Challenges.complete(
-          token: params[:token],
-          session_kind: :api,
-          ip: request.remote_ip,
-          user_agent: request.user_agent
-        )
+        result = Authentication::RodauthSessions.exchange(params[:token])
 
         render json: serialize_authentication(result), status: :created
       end
 
       def destroy
-        authentication_session = current_authentication_session
-        return render_error(:unauthorized, "unauthenticated", "Authentication is required") unless authentication_session
-
-        Authentication::Sessions.revoke(
-          session: authentication_session,
-          reason: "user_logout"
-        )
+        rodauth.remove_current_session
         head :no_content
       end
 
@@ -58,7 +49,7 @@ module Api
         {
           access_token: result.token,
           token_type: "Bearer",
-          expires_at: result.session.expires_at.iso8601(6),
+          expires_at: result.expires_at.iso8601(6),
           user: serialize_user(result.user),
           organization: result.organization ? serialize_organization(result.organization) : nil
         }

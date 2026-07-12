@@ -1,78 +1,82 @@
-# WP-003A: Authentication sessions
+# WP-003A: Rodauth authentication sessions
 
 - Phase: 1 - Behavior parity
-- Status: Implemented
+- Status: Implemented; revised by ADR-011
 - Owner: `apps/control_plane`, `contracts/openapi`
 - Dependencies: WP-003, WP-005
 - Requirements: GOAL-004, INV-007, INV-010, INV-011
 
 ## Objective
 
-Replace the test-only principal seam with Rails-owned passwordless browser sessions and API bearer sessions while preserving explicit organization authorization. Authentication works locally without OAuth/SaaS credentials, remains revocable in PostgreSQL and is ready for a later MFA policy.
+Provide Rails-owned passwordless browser authentication and API Bearer sessions through Rodauth while preserving explicit organization authorization, local operation without SaaS credentials and the published v1 authentication contract.
 
-## Session design
+## Authentication boundary
 
-Authentication uses opaque random credentials rather than stateless JWTs. `AuthenticationSession` persists only a SHA-256 token digest, immutable kind (`web` or `api`), immutable assurance level (`single_factor` or `multi_factor`), issue/expiry times, optional HMAC-digested request context and revocation state. Raw session tokens are returned once and never stored.
+Rodauth Rails is the only authentication engine. It owns login, logout, email authentication, active sessions, JWT handling, CSRF integration and configured GitHub/Google OmniAuth callbacks. Application controllers read the Rodauth principal; they do not parse or authenticate credentials independently.
 
-Web and API credentials have distinct prefixes and cannot cross contexts. Browser controllers accept only an HTTP-only, SameSite=Lax web cookie. Versioned API controllers accept only `Authorization: Bearer` API sessions and deliberately reject web-cookie fallback, preventing cookie-authenticated API CSRF. Sessions expire after the configured `AUTH_TOKEN_TTL_DAYS`; revocation is durable and irreversible.
-
-The Rack middleware resolves credentials before controllers and provides the authenticated `User`, `AuthenticationSession` and method through a private request environment seam. Existing request injection remains only as an internal test seam and cannot be supplied through HTTP headers.
-
-## One-time email challenges
-
-`LoginChallenge` stores normalized email, purpose, token digest, request-IP HMAC, expiry and delivery/consumption state. The raw challenge token is encrypted with Active Record Encryption for email delivery and is cleared atomically on use. It is never included in API responses or default inspection.
-
-Challenges expire after `MAGIC_LINK_TTL_SECONDS`, work once and are serialized by PostgreSQL advisory locks. Rate limits allow five requests per email and twenty per IP in 15 minutes; separate sorted email/IP locks keep those limits correct under concurrency. Responses are generic for valid addresses and silently accept a rate-limited request to avoid account enumeration.
-
-The first verified identity atomically bootstraps the initial organization and owner membership. After an organization exists, unknown emails cannot self-register; later users must be pre-provisioned by the invitation workflow. Existing users without a membership may authenticate but receive no organization until invited.
+Pundit and `Membership` remain separate authorization concerns. A successful authentication does not imply access to any organization.
 
 ## Browser flow
 
-- `GET /auth/login` renders the responsive LayerRail passwordless login.
-- `POST /auth/login` issues and emails a challenge under Rails CSRF protection.
-- `GET /auth/verify` validates without consumption, moves the token into a temporary encrypted HTTP-only cookie and redirects to a query-free confirmation page.
-- `POST /auth/verify` consumes the challenge under CSRF protection, creates a web session and sets the secure production cookie.
-- `POST /auth/logout` revokes the current session, clears the cookie and redirects to login.
-- `/` requires a web session and presents the authenticated identity/organization landing page.
+- `GET /auth/login` renders the legacy-matched LayerRail sign-in page.
+- `POST /auth/login` asks Rodauth to issue a passwordless email link.
+- `GET /auth/verify?key=...` stores the key in the encrypted session and redirects to query-free `GET /auth/verify`.
+- `POST /auth/verify` is CSRF-protected, atomically claims the one-time key and creates the Rodauth browser session.
+- `POST /auth/logout` removes the current PostgreSQL active-session row, clears login state and redirects to login.
+- `/` and organization UI routes require a live Rodauth browser session.
 
-Development uses durable file mail under `tmp/mails` when SMTP is absent and shows a development-only shortcut after challenge creation. Production requires SMTP and `CONTROL_PLANE_HOST`; mail failures are not silently treated as successful delivery.
+The Rails cookie is encrypted, HTTP-only, SameSite=Lax, secure in production and bounded by `AUTH_TOKEN_TTL_DAYS`. Rodauth checks the active-session whitelist on every request; a copied cookie cannot be reused after logout.
+
+Development writes mail to `tmp/mails` when SMTP is absent and exposes a development-only link from the check-email page. Production requires the configured SMTP and control-plane host.
+
+## Provider flow
+
+Rodauth OmniAuth exposes GitHub when `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET` are configured and Google when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are configured. Provider identities are persisted separately from GitHub App installation credentials. Unknown provider identities cannot create accounts after the initial organization exists.
+
+Every auth view uses the legacy FastAPI visual shell: logo header, centered 320-pixel form stack, matching input/buttons/separator, responsive sizing, accessible labels/loading states and persisted light/dark preference.
 
 ## API flow
 
-The additive v1 contract includes:
+The unchanged v1 adapter exposes:
 
-- `POST /v1/auth/challenges` (public generic challenge request);
-- `POST /v1/auth/sessions` (public one-time exchange);
-- `GET /v1/auth/me` (bearer-protected identity and organization list); and
-- `DELETE /v1/auth/session` (bearer session revocation).
+- `POST /v1/auth/challenges` for a generic link request;
+- `POST /v1/auth/sessions` for one-time key exchange;
+- `GET /v1/auth/me` for the authenticated identity and organizations; and
+- `DELETE /v1/auth/session` for current-session revocation.
 
-Successful exchange returns the opaque API token once with expiry, user and nullable organization. All protected product API endpoints now work with live bearer credentials; invalid, expired, revoked and wrong-kind credentials produce the existing 401 contract.
+Exchange returns a Rodauth JWT once with `Bearer`, expiry, user and nullable organization. JWTs carry fixed issuer/audience and expiry claims plus the Rodauth session. Every request checks the corresponding PostgreSQL active-session row. Invalid, expired or revoked JWTs return HTTP 401. API controllers require Bearer authentication and deliberately reject browser-cookie fallback.
 
-## Security and persistence
+## Bootstrap and abuse controls
 
-Authentication IDs are application-generated UUIDv7 values with no database defaults. PostgreSQL enforces user ownership, token-digest uniqueness/format, session kind/assurance, issue-before-expiry, revocation consistency, normalized email, one supported challenge purpose and challenge consumption state. Models are append-only; revoked sessions and consumed challenges cannot be restored or deleted.
+Before an initial organization exists, a normalized email may be staged as a bootstrap candidate. Passwordless verification elects one owner under a PostgreSQL advisory lock, creates one organization/membership and activates that identity. Concurrent losers are blocked. After bootstrap, only provisioned users may authenticate; challenge responses remain generic.
 
-Email, token, authorization and cookie parameters are filtered from Rails logs. Model inspection redacts token and email-sensitive challenge data. IP and user-agent metadata are stored only as keyed HMAC digests. The same existing encryption root derives Active Record Encryption and context HMAC keys; no new plaintext secret is introduced.
+A unique digest-only claim makes a Rodauth email key single-use even under concurrent POSTs. Request-attempt rows store HMAC digests rather than email/IP plaintext and enforce five requests per email and twenty per IP in 15 minutes under sorted advisory locks. Rodauth also keeps one current email-auth key per account and suppresses immediate resends.
+
+## Persistence and migration
+
+Rodauth uses `user_email_auth_keys`, `user_active_session_keys` and `user_identities`. Session identifiers are HMAC-protected in PostgreSQL. One-time claims and request evidence use application-generated UUIDv7 records with digest constraints.
+
+The prior custom `authentication_sessions` and `login_challenges` tables are archived as `legacy_authentication_sessions` and `legacy_login_challenges`. No runtime model or middleware loads them. This preserves reversible migration evidence without running two auth systems.
 
 ## Acceptance evidence
 
-- Raw API/web session tokens never enter PostgreSQL; challenge tokens are encrypted and cleared on use.
-- API and web session kinds cannot cross authentication contexts.
-- Invalid, expired and revoked credentials fail closed.
-- Challenge replay fails and concurrent exchange creates one user/session.
-- Concurrent first identities create exactly one initial organization/owner.
-- Concurrent challenge requests cannot exceed the per-email budget.
-- Unknown identities cannot self-register after bootstrap and receive no existence signal at challenge request time.
-- API challenge/session/current-identity responses pass OpenAPI schemas.
-- Browser login is CSRF-protected, responsive and verified live through challenge consumption, authenticated home and logout.
-- Direct SQL rejects inconsistent revocation/consumption state and unknown-user sessions.
-- The final migration was reset, rolled back and reapplied in development/test with byte-stable schema output.
-- The complete control-plane CI passes with 231 examples, RuboCop, Zeitwerk, Bundler Audit, Importmap Audit and Brakeman.
+- Rodauth is the only middleware that authenticates browser or API credentials.
+- Browser login, query-free confirmation, authenticated home and logout pass request and live-browser tests.
+- Legacy and Rails login screenshots share the same layout, dimensions and controls.
+- GitHub request phase is routed through Rodauth; Google is registered conditionally.
+- API challenge/exchange/me/logout responses pass OpenAPI schemas.
+- Browser cookies cannot authenticate API routes.
+- JWTs fail closed when malformed, expired or absent from the active-session whitelist.
+- A one-time key produces one session under concurrent exchange.
+- Concurrent first identities produce one organization owner.
+- Concurrent requests cannot exceed the email/IP budgets.
+- Raw one-time keys, JWTs, emails and IP addresses are absent from security evidence rows and filtered from logs.
+- Fresh migration, rollback/reapply, RSpec, RuboCop, Zeitwerk, Bundler Audit and Brakeman checks pass.
 
 ## Deferred work
 
-The invitation/member-management flow provisions later identities and records security audit events. A future MFA work packet can issue `multi_factor` sessions and require that assurance level for sensitive policies without changing token shape. GitHub/Google OAuth may become additional challenge issuers, but GitHub App installation credentials remain separate from user authentication. Broader distributed edge rate limiting and abuse controls are required before public self-service.
+Invitation/member management will provision later identities and record security audit events. MFA can be added through Rodauth features and policy assurance checks. Distributed edge abuse controls remain required before public self-service.
 
 ## Rollback
 
-Before sessions are used in production, roll back the authentication migration and remove middleware/routes/controllers. Once live sessions exist, revoke them and use a forward migration; do not drop token history while credentials could remain active. Removing browser authentication must also restore a safe root route rather than exposing authenticated content.
+Revoke all Rodauth active sessions before disabling Rodauth. Restore archived table names only as part of an explicit forward or reversible migration, and restore a safe login boundary before removing the middleware. Never accept Rodauth and legacy credentials simultaneously.

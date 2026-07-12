@@ -30,6 +30,8 @@ Phase 0 introduces a Rails control plane in `apps/control_plane/` beside the cur
 
 In development, `scripts/start.sh` includes `compose/control-plane.dev.yml`. Rails is available on `localhost:3001` and through Traefik at `control.localhost`. Its `/up` endpoint reports process liveness; `/health` verifies PostgreSQL readiness. The service runs as a non-root user and has writable Docker volumes only for logs, temporary data and local storage.
 
+Rodauth Rails is the control plane's sole authentication framework. Passwordless email links, configured GitHub/Google login, encrypted browser cookies, JWT Bearer sessions and PostgreSQL-backed revocation all enter through Rodauth. API routes never accept browser-cookie fallback. Application code adds digest-only request throttling, concurrent one-time-link claims and first-owner election around that boundary; Pundit memberships remain responsible for organization authorization. The Rails authentication pages intentionally reproduce the legacy FastAPI auth shell while the two applications run side by side.
+
 ### Local development provider
 
 WP-010 adds a separate Python process in `apps/local_provider/`. Rails writes provider-neutral desired-state commands to its transactional outbox. The provider claims only deployment, cancellation and Alias-routing commands through HMAC-authenticated internal HTTP endpoints, reconciles the local runtime, and sends versioned ready/failed/canceled callbacks. It does not import Rails code, connect to PostgreSQL or share Rails process memory. SQLite stores provider-side event receipts and runtime/route mappings for replay after crashes.

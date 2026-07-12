@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for(:title) || [ @page_title, "LayerRail Deploy" ].compact.join(" · ") %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="application-name" content="LayerRail Deploy">
+    <meta name="color-scheme" content="light dark">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem("themeMode")
+          if (stored ? stored === "dark" : matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.classList.add("dark")
+          }
+        } catch (_) {}
+      })()
+    </script>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%= stylesheet_link_tag :application, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="auth-page">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <%= render "shared/auth_header" %>
+
+    <% flash.each do |type, message| %>
+      <div class="flash-message flash-message-<%= type %>"
+        role="<%= type.to_s.in?([ "alert", "error" ]) ? "alert" : "status" %>"
+        tabindex="-1"
+        data-controller="focus">
+        <%= message %>
+      </div>
+    <% end %>
+
+    <%= yield %>
+  </body>
+</html>

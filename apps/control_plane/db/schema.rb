@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_12_202000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -37,30 +37,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
     t.check_constraint "previous_revision_id IS NULL OR previous_revision_id <> current_revision_id", name: "aliases_revisions_distinct"
   end
 
-  create_table "authentication_sessions", id: :uuid, default: nil, force: :cascade do |t|
-    t.string "assurance_level", limit: 32, null: false
+  create_table "authentication_request_attempts", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.datetime "expires_at", null: false
+    t.string "email_digest", limit: 64, null: false
     t.string "ip_digest", limit: 64
-    t.datetime "issued_at", null: false
-    t.string "kind", limit: 16, null: false
-    t.datetime "last_used_at"
-    t.datetime "revoked_at"
-    t.string "revoked_reason", limit: 120
-    t.string "token_digest", limit: 64, null: false
     t.datetime "updated_at", null: false
-    t.string "user_agent_digest", limit: 64
-    t.uuid "user_id", null: false
-    t.index ["token_digest"], name: "index_authentication_sessions_on_token_digest", unique: true
-    t.index ["user_id", "kind", "revoked_at", "expires_at"], name: "index_authentication_sessions_for_user"
-    t.index ["user_id"], name: "index_authentication_sessions_on_user_id"
-    t.check_constraint "assurance_level::text = 'single_factor'::text OR assurance_level::text = 'multi_factor'::text", name: "authentication_sessions_assurance_level_allowed"
-    t.check_constraint "expires_at > issued_at", name: "authentication_sessions_expiry_after_issue"
-    t.check_constraint "ip_digest IS NULL OR ip_digest::text ~ '^[0-9a-f]{64}$'::text", name: "authentication_sessions_ip_digest_format"
-    t.check_constraint "kind::text = 'web'::text OR kind::text = 'api'::text", name: "authentication_sessions_kind_allowed"
-    t.check_constraint "revoked_at IS NULL AND revoked_reason IS NULL OR revoked_at IS NOT NULL AND revoked_reason IS NOT NULL AND revoked_reason::text = btrim(revoked_reason::text) AND revoked_reason::text <> ''::text", name: "authentication_sessions_revocation_consistent"
-    t.check_constraint "token_digest::text ~ '^[0-9a-f]{64}$'::text", name: "authentication_sessions_token_digest_format"
-    t.check_constraint "user_agent_digest IS NULL OR user_agent_digest::text ~ '^[0-9a-f]{64}$'::text", name: "authentication_sessions_user_agent_digest_format"
+    t.index ["email_digest", "created_at"], name: "idx_on_email_digest_created_at_7255cb1346"
+    t.index ["ip_digest", "created_at"], name: "idx_on_ip_digest_created_at_97d19ba034"
+    t.check_constraint "email_digest::text ~ '^[0-9a-f]{64}$'::text", name: "authentication_request_attempts_email_digest_format"
+    t.check_constraint "ip_digest IS NULL OR ip_digest::text ~ '^[0-9a-f]{64}$'::text", name: "authentication_request_attempts_ip_digest_format"
   end
 
   create_table "builds", id: :uuid, default: nil, force: :cascade do |t|
@@ -304,7 +289,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
     t.check_constraint "response_status >= 200 AND response_status <= 599", name: "idempotency_records_status_range"
   end
 
-  create_table "login_challenges", id: :uuid, default: nil, force: :cascade do |t|
+  create_table "legacy_authentication_sessions", id: :uuid, default: nil, force: :cascade do |t|
+    t.string "assurance_level", limit: 32, null: false
+    t.datetime "created_at", null: false
+    t.datetime "expires_at", null: false
+    t.string "ip_digest", limit: 64
+    t.datetime "issued_at", null: false
+    t.string "kind", limit: 16, null: false
+    t.datetime "last_used_at"
+    t.datetime "revoked_at"
+    t.string "revoked_reason", limit: 120
+    t.string "token_digest", limit: 64, null: false
+    t.datetime "updated_at", null: false
+    t.string "user_agent_digest", limit: 64
+    t.uuid "user_id", null: false
+    t.index ["token_digest"], name: "index_legacy_authentication_sessions_on_token_digest", unique: true
+    t.index ["user_id", "kind", "revoked_at", "expires_at"], name: "index_authentication_sessions_for_user"
+    t.index ["user_id"], name: "index_legacy_authentication_sessions_on_user_id"
+    t.check_constraint "assurance_level::text = 'single_factor'::text OR assurance_level::text = 'multi_factor'::text", name: "authentication_sessions_assurance_level_allowed"
+    t.check_constraint "expires_at > issued_at", name: "authentication_sessions_expiry_after_issue"
+    t.check_constraint "ip_digest IS NULL OR ip_digest::text ~ '^[0-9a-f]{64}$'::text", name: "authentication_sessions_ip_digest_format"
+    t.check_constraint "kind::text = 'web'::text OR kind::text = 'api'::text", name: "authentication_sessions_kind_allowed"
+    t.check_constraint "revoked_at IS NULL AND revoked_reason IS NULL OR revoked_at IS NOT NULL AND revoked_reason IS NOT NULL AND revoked_reason::text = btrim(revoked_reason::text) AND revoked_reason::text <> ''::text", name: "authentication_sessions_revocation_consistent"
+    t.check_constraint "token_digest::text ~ '^[0-9a-f]{64}$'::text", name: "authentication_sessions_token_digest_format"
+    t.check_constraint "user_agent_digest IS NULL OR user_agent_digest::text ~ '^[0-9a-f]{64}$'::text", name: "authentication_sessions_user_agent_digest_format"
+  end
+
+  create_table "legacy_login_challenges", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "consumed_at"
     t.datetime "created_at", null: false
     t.datetime "delivered_at"
@@ -315,9 +326,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
     t.text "token"
     t.string "token_digest", limit: 64, null: false
     t.datetime "updated_at", null: false
-    t.index ["email", "created_at"], name: "index_login_challenges_on_email_and_created_at"
-    t.index ["requested_ip_digest", "created_at"], name: "index_login_challenges_on_requested_ip_digest_and_created_at"
-    t.index ["token_digest"], name: "index_login_challenges_on_token_digest", unique: true
+    t.index ["email", "created_at"], name: "index_legacy_login_challenges_on_email_and_created_at"
+    t.index ["requested_ip_digest", "created_at"], name: "idx_on_requested_ip_digest_created_at_373f3599c0"
+    t.index ["token_digest"], name: "index_legacy_login_challenges_on_token_digest", unique: true
     t.check_constraint "consumed_at IS NULL AND token IS NOT NULL OR consumed_at IS NOT NULL AND token IS NULL", name: "login_challenges_consumption_consistent"
     t.check_constraint "email::text = lower(btrim(email::text)) AND email::text <> ''::text", name: "login_challenges_email_normalized"
     t.check_constraint "expires_at > created_at", name: "login_challenges_expiry_after_creation"
@@ -459,6 +470,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
     t.check_constraint "status::text = 'candidate'::text OR status::text = 'ready'::text OR status::text = 'retired'::text", name: "revisions_status_allowed"
   end
 
+  create_table "rodauth_login_claims", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "token_digest", limit: 64, null: false
+    t.datetime "updated_at", null: false
+    t.index ["token_digest"], name: "index_rodauth_login_claims_on_token_digest", unique: true
+    t.check_constraint "token_digest::text ~ '^[0-9a-f]{64}$'::text", name: "rodauth_login_claims_token_digest_format"
+  end
+
   create_table "services", id: :uuid, default: nil, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "lifecycle_state", limit: 32, default: "active", null: false
@@ -482,12 +501,41 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
     t.check_constraint "workload_type::text = 'static'::text OR workload_type::text = 'web'::text OR workload_type::text = 'private'::text OR workload_type::text = 'worker'::text OR workload_type::text = 'cron'::text OR workload_type::text = 'job'::text", name: "services_workload_type_allowed"
   end
 
+  create_table "user_active_session_keys", primary_key: ["user_id", "session_id"], force: :cascade do |t|
+    t.datetime "created_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.datetime "last_use", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.string "session_id", null: false
+    t.uuid "user_id", null: false
+    t.index ["user_id"], name: "index_user_active_session_keys_on_user_id"
+  end
+
+  create_table "user_email_auth_keys", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "deadline", null: false
+    t.datetime "email_last_sent", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.string "key", null: false
+  end
+
+  create_table "user_identities", id: :uuid, default: nil, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "provider", limit: 64, null: false
+    t.string "uid", limit: 255, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["provider", "uid"], name: "index_user_identities_on_provider_and_uid", unique: true
+    t.index ["user_id", "provider"], name: "index_user_identities_on_user_id_and_provider", unique: true
+    t.index ["user_id"], name: "index_user_identities_on_user_id"
+  end
+
   create_table "users", id: :uuid, default: nil, force: :cascade do |t|
+    t.string "authentication_state", limit: 32, default: "active", null: false
     t.datetime "created_at", null: false
     t.string "email", limit: 320, null: false
     t.string "name", limit: 120, null: false
+    t.string "password_hash", limit: 255
     t.datetime "updated_at", null: false
     t.index "lower((email)::text)", name: "index_users_on_lower_email", unique: true
+    t.index ["authentication_state"], name: "index_users_on_authentication_state"
+    t.check_constraint "authentication_state::text = ANY (ARRAY['active'::character varying::text, 'bootstrap_candidate'::character varying::text, 'blocked'::character varying::text])", name: "users_authentication_state_allowed"
     t.check_constraint "btrim(name::text) <> ''::text", name: "users_name_present"
     t.check_constraint "email::text = lower(btrim(email::text))", name: "users_email_normalized"
   end
@@ -497,7 +545,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
   add_foreign_key "aliases", "revisions", column: ["current_revision_id", "organization_id", "project_id", "service_id", "environment_id", "current_revision_status"], primary_key: ["id", "organization_id", "project_id", "service_id", "environment_id", "status"], on_delete: :restrict
   add_foreign_key "aliases", "revisions", column: ["previous_revision_id", "organization_id", "project_id", "service_id", "environment_id", "previous_revision_status"], primary_key: ["id", "organization_id", "project_id", "service_id", "environment_id", "status"], on_delete: :restrict
   add_foreign_key "aliases", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
-  add_foreign_key "authentication_sessions", "users", on_delete: :restrict
   add_foreign_key "builds", "deployments", column: ["deployment_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "builds", "organizations", on_delete: :restrict
   add_foreign_key "configuration_snapshots", "configuration_versions", column: ["project_configuration_version_id", "project_id", "environment_id"], primary_key: ["id", "project_id", "environment_id"], on_delete: :restrict
@@ -522,6 +569,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
   add_foreign_key "git_webhook_inboxes", "deployments", column: ["deployment_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "git_webhook_inboxes", "git_installations", column: ["git_installation_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "idempotency_records", "organizations", on_delete: :restrict
+  add_foreign_key "legacy_authentication_sessions", "users", on_delete: :restrict
   add_foreign_key "memberships", "organizations", on_delete: :restrict
   add_foreign_key "memberships", "users", on_delete: :restrict
   add_foreign_key "outbox_events", "organizations", on_delete: :restrict
@@ -537,4 +585,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_11_218000) do
   add_foreign_key "revisions", "projects", column: ["project_id", "organization_id"], primary_key: ["id", "organization_id"], on_delete: :restrict
   add_foreign_key "revisions", "services", column: ["service_id", "project_id"], primary_key: ["id", "project_id"], on_delete: :restrict
   add_foreign_key "services", "projects", on_delete: :restrict
+  add_foreign_key "user_active_session_keys", "users", on_delete: :cascade
+  add_foreign_key "user_email_auth_keys", "users", column: "id", on_delete: :cascade
+  add_foreign_key "user_identities", "users", on_delete: :cascade
 end

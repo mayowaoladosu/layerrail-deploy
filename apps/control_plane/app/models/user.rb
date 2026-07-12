@@ -1,7 +1,14 @@
 class User < ApplicationRecord
-  has_many :authentication_sessions, dependent: :restrict_with_exception
+  AUTHENTICATION_STATES = {
+    active: "active",
+    bootstrap_candidate: "bootstrap_candidate",
+    blocked: "blocked"
+  }.freeze
+
   has_many :memberships, dependent: :restrict_with_exception
   has_many :organizations, through: :memberships
+
+  enum :authentication_state, AUTHENTICATION_STATES, prefix: true, validate: true
 
   before_validation :normalize_attributes
 

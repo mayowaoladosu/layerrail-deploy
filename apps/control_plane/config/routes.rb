@@ -1,5 +1,5 @@
 Rails.application.routes.draw do
-  root "authentication#home"
+  root "home#index"
   get "health" => "health#show", as: :health
 
   namespace :api, path: nil do
@@ -43,12 +43,7 @@ Rails.application.routes.draw do
     end
   end
 
-  get "auth/login" => "authentication#login", as: :auth_login
-  post "auth/login" => "authentication#create"
-  get "auth/verify" => "authentication#verify", as: :auth_verify
-  get "auth/confirm" => "authentication#confirm", as: :auth_confirm
-  post "auth/verify" => "authentication#complete"
-  post "auth/logout" => "authentication#logout", as: :auth_logout
+  get "auth/check-email" => "auth_pages#check_email", as: :auth_check_email
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

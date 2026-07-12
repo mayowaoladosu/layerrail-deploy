@@ -3,7 +3,7 @@ require "rails_helper"
 require "json_schemer"
 require "yaml"
 
-RSpec.describe "Authentication API", type: :request do
+RSpec.describe "Rodauth authentication API adapter", type: :request do
   def api_schema(name)
     contract_path = Pathname(
       ENV.fetch("LRAIL_CONTRACTS_DIR", Rails.root.join("../../contracts"))
@@ -21,28 +21,29 @@ RSpec.describe "Authentication API", type: :request do
     post "/v1/auth/sessions", params: { token: }, as: :json
   end
 
-  it "sends a generic one-time challenge response without exposing its token" do
+  it "sends a generic Rodauth link response without exposing its token" do
     expect do
       request_challenge
-    end.to change(LoginChallenge, :count).by(1)
-      .and change(ActionMailer::Base.deliveries, :count).by(1)
+    end.to change(ActionMailer::Base.deliveries, :count).by(1)
+      .and change(User, :count).by(1)
 
     expect(response).to have_http_status(:accepted)
     expect(response.parsed_body).to include(
       "message" => "If the address can sign in, a one-time link has been sent",
-      "expires_in" => Authentication::Challenges::DEFAULT_TTL.to_i
+      "expires_in" => RodauthMain::EMAIL_AUTH_TTL
     )
-    expect(response.body).not_to include("lr_challenge_")
-    expect(LoginChallenge.sole.delivered_at).to be_present
-    expect(ActionMailer::Base.deliveries.last.body.encoded).to include("lr_challenge_")
+    expect(response.body).not_to include("/auth/verify", "key=")
+    expect(last_email_auth_key).to be_present
+    expect(ApplicationRecord.connection.select_value(
+      "SELECT COUNT(*) FROM user_email_auth_keys"
+    ).to_i).to eq(1)
   end
 
-  it "exchanges one challenge for a schema-valid bearer session and bootstraps the first owner" do
+  it "exchanges one Rodauth key for a schema-valid bearer session and initial owner" do
     request_challenge(email: "Founder@Example.com")
-    challenge = LoginChallenge.sole
-    raw_token = challenge.token
+    key = last_email_auth_key
 
-    exchange(raw_token)
+    exchange(key)
 
     expect(response).to have_http_status(:created)
     expect(api_schema("AuthenticationResult")).to be_valid(response.parsed_body)
@@ -51,18 +52,24 @@ RSpec.describe "Authentication API", type: :request do
       "user" => include("email" => "founder@example.com"),
       "organization" => include("id" => Organization.sole.id)
     )
-    expect(response.parsed_body.fetch("access_token")).to start_with("lr_api_")
-    expect(challenge.reload).to have_attributes(consumed_at: be_present, token: nil)
+    access_token = response.parsed_body.fetch("access_token")
+    expect(access_token.split(".").length).to eq(3)
+    expect(User.sole).to be_authentication_state_active
+    expect(RodauthLoginClaim.sole.token_digest).to eq(Digest::SHA256.hexdigest(key))
 
-    exchange(raw_token)
+    get "/v1/auth/me", headers: { "Authorization" => "Bearer #{access_token}" }, as: :json
+    expect(response).to have_http_status(:ok)
+    expect(response.parsed_body.dig("user", "email")).to eq("founder@example.com")
+
+    exchange(key)
     expect(response).to have_http_status(:unprocessable_content)
     expect(response.parsed_body.fetch("code")).to eq("invalid_challenge")
   end
 
-  it "returns the current identity and revokes the bearer session" do
+  it "returns the current identity and revokes the Rodauth bearer session" do
     owner = User.create!(email: "auth-me@example.com", name: "Auth Me")
     organization = Organizations::Create.call(principal: owner, name: "Auth Me Organization").organization
-    issued = Authentication::Sessions.issue(user: owner, kind: :api, ip: nil, user_agent: nil)
+    issued = Authentication::RodauthSessions.issue(owner)
     headers = { "Authorization" => "Bearer #{issued.token}" }
 
     get "/v1/auth/me", headers:, as: :json
@@ -75,7 +82,6 @@ RSpec.describe "Authentication API", type: :request do
 
     delete "/v1/auth/session", headers:, as: :json
     expect(response).to have_http_status(:no_content)
-    expect(issued.session.reload.revoked_at).to be_present
 
     get "/v1/auth/me", headers:, as: :json
     expect(response).to have_http_status(:unauthorized)
@@ -83,12 +89,13 @@ RSpec.describe "Authentication API", type: :request do
 
   it "rate limits silently and validates malformed login input" do
     5.times { request_challenge(email: "rate-api@example.com") }
+    attempt_count = AuthenticationRequestAttempt.count
     delivery_count = ActionMailer::Base.deliveries.count
 
     request_challenge(email: "rate-api@example.com")
     expect(response).to have_http_status(:accepted)
+    expect(AuthenticationRequestAttempt.count).to eq(attempt_count)
     expect(ActionMailer::Base.deliveries.count).to eq(delivery_count)
-    expect(LoginChallenge.where(email: "rate-api@example.com").count).to eq(5)
 
     request_challenge(email: "not-an-email")
     expect(response).to have_http_status(:unprocessable_content)
@@ -97,5 +104,18 @@ RSpec.describe "Authentication API", type: :request do
     exchange("invalid")
     expect(response).to have_http_status(:unprocessable_content)
     expect(response.parsed_body.fetch("code")).to eq("invalid_challenge")
+  end
+
+  it "does not reveal whether an unknown identity exists after bootstrap" do
+    owner = User.create!(email: "existing-owner@example.com", name: "Existing Owner")
+    Organizations::Create.call(principal: owner, name: "Existing Organization")
+    deliveries = ActionMailer::Base.deliveries.count
+
+    request_challenge(email: "unknown@example.com")
+
+    expect(response).to have_http_status(:accepted)
+    expect(response.parsed_body.fetch("message")).to include("If the address can sign in")
+    expect(ActionMailer::Base.deliveries.count).to eq(deliveries)
+    expect(User.find_by(email: "unknown@example.com")).to be_nil
   end
 end

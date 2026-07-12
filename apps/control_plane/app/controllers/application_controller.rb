@@ -18,13 +18,12 @@ class ApplicationController < ActionController::Base
   end
 
   def current_principal
-    principal = request.env["lrail.authenticated_principal"]
-    principal if principal.is_a?(User) && principal.persisted?
-  end
+    injected = request.env["lrail.authenticated_principal"]
+    return injected if Rails.env.test? && injected.is_a?(User) && injected.persisted?
+    return unless rodauth.logged_in?
 
-  def current_authentication_session
-    session = request.env["lrail.authentication_session"]
-    session if session.is_a?(AuthenticationSession) && session.persisted?
+    account = rodauth.rails_account
+    account if account.is_a?(User) && account.persisted?
   end
 
   def current_organization
@@ -32,12 +31,12 @@ class ApplicationController < ActionController::Base
   end
 
   def web_authenticated?
-    current_principal && request.env["lrail.authentication_method"] == "cookie"
+    current_principal && !rodauth.use_jwt?
   end
 
   def require_web_session!
-    return if web_authenticated? && current_authentication_session
+    return if web_authenticated?
 
-    redirect_to auth_login_path, status: :see_other
+    redirect_to rodauth.login_path, status: :see_other
   end
 end

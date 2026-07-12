@@ -1,69 +1,114 @@
 require "rails_helper"
 
-RSpec.describe "Browser authentication", type: :request do
-  it "renders login and redirects unauthenticated home requests" do
+RSpec.describe "Rodauth browser authentication", type: :request do
+  it "renders the legacy authentication design and redirects unauthenticated requests" do
     get "/"
-    expect(response).to redirect_to(auth_login_path)
+    expect(response).to redirect_to("/auth/login")
 
-    get auth_login_path
+    get "/auth/login"
+
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Sign in to your control plane")
+    expect(response.body).to include(
+      "Sign in to LayerRail Deploy",
+      "Continue with email",
+      "Continue with GitHub",
+      "legacy-auth-main",
+      "auth-site-logo"
+    )
+    expect(response.body).not_to include("auth-brand", "Ship code without surrendering control")
   end
 
-  it "uses one email challenge to create a secure web session" do
+  it "starts configured provider login through Rodauth OmniAuth" do
+    post "/auth/github"
+
+    expect(response).to have_http_status(:redirect)
+    location = URI(response.location)
+    expect(location.host).to eq("github.com")
+    expect(location.path).to eq("/login/oauth/authorize")
+  end
+
+  it "uses one Rodauth email link to bootstrap and authenticate the first owner" do
     expect do
-      post auth_login_path, params: { email: "Browser.User@Example.com" }
-    end.to change(LoginChallenge, :count).by(1)
+      post "/auth/login", params: { email: "Browser.User@Example.com" }
+    end.to change(User, :count).by(1)
       .and change(ActionMailer::Base.deliveries, :count).by(1)
 
-    expect(response).to have_http_status(:accepted)
-    expect(response.body).to include("Check your email")
-    challenge = LoginChallenge.sole
-
-    get auth_verify_path(token: challenge.token)
-
-    expect(response).to redirect_to(auth_confirm_path)
-    expect(challenge.reload.consumed_at).to be_nil
+    expect(response).to redirect_to(auth_check_email_path)
     follow_redirect!
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Finish signing in")
+    expect(response.body).to include("Check your email")
 
-    post auth_verify_path
+    key = last_email_auth_key
+    get last_email_auth_path
+
+    expect(response).to redirect_to("/auth/verify")
+    follow_redirect!
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Finish signing in", "Continue with email")
+
+    expect do
+      post "/auth/verify"
+    end.to change(Organization, :count).by(1)
+      .and change(Membership, :count).by(1)
+      .and change(RodauthLoginClaim, :count).by(1)
 
     expect(response).to redirect_to(root_path)
-    set_cookie = Array(response.headers.fetch("Set-Cookie")).join("; ")
-    expect(set_cookie).to include("#{Authentication::Middleware::COOKIE_NAME}=")
-    expect(set_cookie.downcase).to include("httponly", "samesite=lax")
-    expect(response.headers.fetch("Set-Cookie")).not_to include(challenge.token)
+    set_cookie = Array(response.headers.fetch("Set-Cookie")).join("; ").downcase
+    expect(set_cookie).to include("_lrail_control_plane_session=", "httponly", "samesite=lax")
+    expect(set_cookie).not_to include(key.downcase)
+
     follow_redirect!
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Welcome, Browser User")
-    expect(challenge.reload).to have_attributes(consumed_at: be_present, token: nil)
-    expect(AuthenticationSession.sole.kind).to eq("web")
-    expect(Organization.sole.memberships.sole.role).to eq("owner")
+    expect(User.sole).to have_attributes(
+      email: "browser.user@example.com",
+      authentication_state: "active"
+    )
+    expect(Organization.sole.memberships.sole).to have_attributes(user: User.sole, role: "owner")
+    expect(RodauthLoginClaim.sole.token_digest).to eq(Digest::SHA256.hexdigest(key))
   end
 
-  it "revokes the current web session on logout" do
+  it "revokes its active Rodauth session on logout" do
     owner = User.create!(email: "browser-logout@example.com", name: "Browser Logout")
     Organizations::Create.call(principal: owner, name: "Browser Logout Organization")
-    issued = Authentication::Sessions.issue(user: owner, kind: :web, ip: nil, user_agent: nil)
-    cookies[Authentication::Middleware::COOKIE_NAME] = issued.token
+    sign_in_with_rodauth(owner)
+
+    expect(ApplicationRecord.connection.select_value(
+      "SELECT COUNT(*) FROM user_active_session_keys WHERE user_id = '#{owner.id}'"
+    ).to_i).to eq(1)
+
+    post "/auth/logout"
+    expect(response).to redirect_to("/auth/login")
+    expect(ApplicationRecord.connection.select_value(
+      "SELECT COUNT(*) FROM user_active_session_keys WHERE user_id = '#{owner.id}'"
+    ).to_i).to eq(0)
 
     get root_path
-    expect(response).to have_http_status(:ok)
-
-    post auth_logout_path
-    expect(response).to redirect_to(auth_login_path)
-    expect(issued.session.reload.revoked_at).to be_present
-
-    get root_path
-    expect(response).to redirect_to(auth_login_path)
+    expect(response).to redirect_to("/auth/login")
   end
 
-  it "rejects an invalid or replayed browser link without creating a session" do
-    get auth_verify_path(token: "invalid")
-    expect(response).to have_http_status(:unprocessable_content)
+  it "rejects invalid and replayed links without creating another session" do
+    owner = User.create!(email: "browser-replay@example.com", name: "Browser Replay")
+    Organizations::Create.call(principal: owner, name: "Browser Replay Organization")
+
+    post "/auth/login", params: { email: owner.email }
+    used_path = last_email_auth_path
+    get used_path
+    follow_redirect!
+    post "/auth/verify"
+    post "/auth/logout"
+
+    get used_path
+    expect(response).to redirect_to("/auth/verify")
+    follow_redirect!
+    expect(response).to redirect_to("/auth/login")
+    follow_redirect!
     expect(response.body).to include("invalid or has expired")
-    expect(AuthenticationSession).not_to exist
+
+    get "/auth/verify", params: { key: "invalid" }
+    expect(response).to redirect_to("/auth/verify")
+    follow_redirect!
+    expect(response).to redirect_to("/auth/login")
+    expect(RodauthLoginClaim.count).to eq(1)
   end
 end

@@ -22,12 +22,7 @@ service = project.services.find_by(name: "Sample Web") ||
     runtime_policy: { "readiness_path" => "/health" }
   ).service
 environment = project.environments.find_by!(kind: :production)
-issued = Authentication::Sessions.issue(
-  user:,
-  kind: :api,
-  ip: nil,
-  user_agent: "local-provider-e2e"
-)
+issued = Authentication::RodauthSessions.issue(user)
 
 api_request = lambda do |method:, path:, body: nil, key: nil|
   request_class = {
@@ -238,5 +233,5 @@ begin
     build_count:
   )
 ensure
-  Authentication::Sessions.revoke(session: issued.session, reason: "e2e_complete")
+  Authentication::RodauthSessions.revoke(issued.token)
 end

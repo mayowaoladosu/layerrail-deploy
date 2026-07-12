@@ -1,0 +1,23 @@
+<% content_for :title, "Sign out" %>
+
+<main id="main-content" class="legacy-auth-main">
+  <div class="legacy-auth-stack legacy-auth-message">
+    <h1>Sign out of LayerRail Deploy?</h1>
+    <p>The current browser session will be revoked immediately.</p>
+
+    <%= form_with url: rodauth.logout_path,
+      method: :post,
+      class: "legacy-auth-form",
+      data: {
+        turbo: false,
+        controller: "auth-submit",
+        action: "submit->auth-submit#start"
+      } do |form| %>
+      <%= form.submit "Sign out",
+        class: "legacy-auth-button legacy-auth-button-primary",
+        data: { auth_submit_target: "button" } %>
+    <% end %>
+
+    <%= link_to "Return to LayerRail Deploy", root_path, class: "legacy-auth-link" %>
+  </div>
+</main>

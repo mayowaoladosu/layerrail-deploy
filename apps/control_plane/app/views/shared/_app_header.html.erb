@@ -17,6 +17,6 @@
       <span class="organization-chip"><%= current_organization.name %></span>
     <% end %>
     <span class="account-name"><%= current_principal.name %></span>
-    <%= button_to "Sign out", auth_logout_path, method: :post, class: "text-button" %>
+    <%= button_to "Sign out", rodauth.logout_path, method: :post, class: "text-button" %>
   </div>
 </header>

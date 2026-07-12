@@ -2,8 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Deployment UI", type: :request do
   def sign_in(user)
-    issued = Authentication::Sessions.issue(user:, kind: :web, ip: nil, user_agent: "deployment-ui-spec")
-    cookies[Authentication::Middleware::COOKIE_NAME] = issued.token
+    sign_in_with_rodauth(user)
   end
 
   def provider_result(status: :ok, entries: [], truncated: false, retained: false)
@@ -67,7 +66,7 @@ RSpec.describe "Deployment UI", type: :request do
     foreign_context, = create_deployment_domain(sequence: "ui-view-foreign")
 
     get organization_deployments_path(context.organization)
-    expect(response).to redirect_to(auth_login_path)
+    expect(response).to redirect_to("/auth/login")
 
     sign_in(context.principal)
     get organization_deployments_path(context.organization)

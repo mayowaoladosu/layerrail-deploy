@@ -1,0 +1,16 @@
+<% content_for :title, "Check your email" %>
+
+<main id="main-content" class="legacy-auth-main">
+  <div class="legacy-auth-stack legacy-auth-message">
+    <h1>Check your email</h1>
+    <p>If the address can sign in, a secure link is on its way. It expires after 15 minutes.</p>
+
+    <% if @development_verification_url %>
+      <%= link_to "Open the local sign-in link",
+        @development_verification_url,
+        class: "legacy-auth-button legacy-auth-button-primary" %>
+    <% end %>
+
+    <%= link_to "Use a different email", rodauth.login_path, class: "legacy-auth-link" %>
+  </div>
+</main>

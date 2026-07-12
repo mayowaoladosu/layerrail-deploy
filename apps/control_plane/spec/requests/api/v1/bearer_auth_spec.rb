@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe "API bearer authentication", type: :request do
+RSpec.describe "Rodauth API bearer authentication", type: :request do
   def setup_identity
     owner = User.create!(email: "bearer-owner@example.com", name: "Bearer Owner")
     organization = Organizations::Create.call(principal: owner, name: "Bearer Organization").organization
@@ -19,14 +19,9 @@ RSpec.describe "API bearer authentication", type: :request do
       as: :json
   end
 
-  it "authenticates a live API token without the test-only request seam" do
+  it "authenticates a live Rodauth JWT without the test-only request seam" do
     owner, organization = setup_identity
-    issued = Authentication::Sessions.issue(
-      user: owner,
-      kind: :api,
-      ip: "192.0.2.30",
-      user_agent: "RSpec API"
-    )
+    issued = Authentication::RodauthSessions.issue(owner)
 
     post_project(
       organization:,
@@ -36,12 +31,14 @@ RSpec.describe "API bearer authentication", type: :request do
 
     expect(response).to have_http_status(:created)
     expect(response.parsed_body.fetch("organization_id")).to eq(organization.id)
-    expect(issued.session.reload.last_used_at).to be_present
+    expect(ApplicationRecord.connection.select_value(
+      "SELECT COUNT(*) FROM user_active_session_keys WHERE user_id = '#{owner.id}'"
+    ).to_i).to eq(1)
   end
 
-  it "rejects invalid and revoked bearer tokens" do
+  it "rejects invalid, expired, and revoked bearer tokens" do
     owner, organization = setup_identity
-    issued = Authentication::Sessions.issue(user: owner, kind: :api, ip: nil, user_agent: nil)
+    issued = Authentication::RodauthSessions.issue(owner)
 
     post_project(
       organization:,
@@ -50,7 +47,24 @@ RSpec.describe "API bearer authentication", type: :request do
     )
     expect(response).to have_http_status(:unauthorized)
 
-    Authentication::Sessions.revoke(session: issued.session, reason: "user_logout")
+    expired = JWT.encode(
+      {
+        "session" => { "account_id" => owner.id },
+        "iss" => RodauthMain::JWT_ISSUER,
+        "aud" => RodauthMain::JWT_AUDIENCE,
+        "exp" => 1.minute.ago.to_i
+      },
+      Rails.application.secret_key_base,
+      "HS256"
+    )
+    post_project(
+      organization:,
+      key: "bearer-expired",
+      headers: { "Authorization" => "Bearer #{expired}" }
+    )
+    expect(response).to have_http_status(:unauthorized)
+
+    expect(Authentication::RodauthSessions.revoke(issued.token)).to be(true)
     post_project(
       organization:,
       key: "bearer-revoked",
@@ -59,22 +73,17 @@ RSpec.describe "API bearer authentication", type: :request do
     expect(response).to have_http_status(:unauthorized)
   end
 
-  it "does not accept a web cookie or fall back to it after a bad bearer header" do
+  it "never treats the browser session as API authentication" do
     owner, organization = setup_identity
-    issued = Authentication::Sessions.issue(user: owner, kind: :web, ip: nil, user_agent: nil)
-    cookie = "#{Authentication::Middleware::COOKIE_NAME}=#{issued.token}"
+    sign_in_with_rodauth(owner)
 
-    post_project(
-      organization:,
-      key: "cookie-only",
-      headers: { "Cookie" => cookie }
-    )
+    post_project(organization:, key: "cookie-only")
     expect(response).to have_http_status(:unauthorized)
 
     post_project(
       organization:,
       key: "cookie-fallback",
-      headers: { "Cookie" => cookie, "Authorization" => "Bearer invalid" }
+      headers: { "Authorization" => "Bearer invalid" }
     )
     expect(response).to have_http_status(:unauthorized)
   end
