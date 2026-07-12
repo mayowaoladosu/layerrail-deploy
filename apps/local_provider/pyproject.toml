@@ -5,7 +5,7 @@ description = "LayerRail local development runtime provider"
 requires-python = "==3.13.*"
 dependencies = [
     "aiodocker==0.24.0",
-    "aiohttp==3.12.14",
+    "aiohttp==3.14.1",
     "httpx==0.28.1",
     "PyYAML==6.0.2",
 ]
