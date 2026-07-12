@@ -40,6 +40,14 @@ Docker access is isolated behind `local-docker-proxy` and an endpoint-level HAPr
 
 Run `scripts/local-provider-e2e.sh` to prove deploy, readiness, immutable routing, two promotions, rollback without a new Build, non-serving cancellation and the Docker isolation controls.
 
+### Isolated BuildKit proof
+
+WP-011 adds an opt-in `buildkit-poc` Compose profile, not a product build service. It runs a digest-pinned rootless BuildKit OCI worker with its normal process sandbox, a read-only outer filesystem, bounded resources, and a dedicated internal network with no default route. Daemon control is a Unix socket mounted read-only into a networkless `buildctl` client; there is no TCP listener or Docker socket.
+
+Scratch-based malicious fixtures execute real `RUN` steps and fail if cloud metadata or a direct-IP control-plane canary is reachable. A concurrent owner/attacker pair proves that another build cannot traverse `/proc` to a secret mount, daemon socket or daemon cache, and the harness scans progress logs and persistent state for secret plaintext. Run `scripts/buildkit-isolation-e2e.sh` for the complete proof.
+
+The proof intentionally has no egress, Git clone, base-image pull, registry publication or WP-010 integration. Rootless BuildKit in Docker is not the production sandbox; Phase 2 still requires ephemeral isolated workers, controlled egress and credentials, gVisor/Kata or stronger isolation, quotas, cancellation, logs and artifact evidence.
+
 ## File structure
 
 - `app/`: The main FastAPI application (see README file).
@@ -203,6 +211,7 @@ Notes:
 - `devpush_runner`: runner network for deployed containers; Traefik and workers attach to route/probe.
 - `devpush_local_provider_docker`: internal WP-010 provider-to-constrained-Docker-proxy network; Rails is not attached.
 - `devpush_local_runtime`: internal WP-010 sample runtime network shared only by the provider, Traefik and managed sample containers.
+- `devpush_buildkit_sandbox`: internal WP-011 proof network with no default route; only the rootless BuildKit daemon is attached.
 
 ## Observability
 

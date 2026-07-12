@@ -10,6 +10,27 @@ permissions:
   contents: read
 
 jobs:
+  buildkit-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DEVPUSH_ENV: development
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Compose environment
+        run: |
+          mkdir -p data
+          printf '%s\n' \
+            'APP_HOSTNAME=localhost' \
+            'DEPLOY_DOMAIN=localhost' \
+            'POSTGRES_PASSWORD=buildkit-proof-not-used' \
+            > data/.env
+
+      - name: Prove BuildKit isolation
+        run: bash scripts/buildkit-isolation-e2e.sh
+
   ruby-toolchain:
     runs-on: ubuntu-latest
     services:

@@ -99,6 +99,114 @@ services:
     networks:
       - local-provider-docker
 
+  buildkit-volume-init:
+    profiles: ["buildkit-poc"]
+    image: moby/buildkit:v0.26.2-rootless@sha256:0ffa2fcf6b8757c47d569b3ef0f03f9d5eb3b9ff5ce68d858f994f89b749da0c
+    user: "0:0"
+    network_mode: none
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        install -d -o 1000 -g 1000 -m 0700 /state /socket
+        rm -f /socket/buildkitd.sock
+        chown -R 1000:1000 /state /socket
+    read_only: true
+    volumes:
+      - buildkit-state:/state
+      - buildkit-socket:/socket
+
+  buildkitd:
+    profiles: ["buildkit-poc"]
+    image: moby/buildkit:v0.26.2-rootless@sha256:0ffa2fcf6b8757c47d569b3ef0f03f9d5eb3b9ff5ce68d858f994f89b749da0c
+    restart: unless-stopped
+    depends_on:
+      buildkit-volume-init:
+        condition: service_completed_successfully
+    command:
+      - --addr
+      - unix:///run/user/1000/buildkit/buildkitd.sock
+      - --oci-worker-snapshotter=native
+    networks:
+      - buildkit-sandbox
+    read_only: true
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
+      - systempaths=unconfined
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 512
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=67108864,uid=1000,gid=1000
+      - /home/user/.local/tmp:rw,nosuid,nodev,noexec,size=16777216,uid=1000,gid=1000
+      - /run/user/1000:rw,nosuid,nodev,noexec,size=16777216,uid=1000,gid=1000
+    volumes:
+      - buildkit-state:/home/user/.local/share/buildkit
+      - buildkit-socket:/run/user/1000/buildkit
+    healthcheck:
+      test: ["CMD", "/usr/bin/buildctl", "--addr", "unix:///run/user/1000/buildkit/buildkitd.sock", "debug", "workers"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+  buildkit-client:
+    profiles: ["buildkit-poc"]
+    image: moby/buildkit:v0.26.2-rootless@sha256:0ffa2fcf6b8757c47d569b3ef0f03f9d5eb3b9ff5ce68d858f994f89b749da0c
+    user: "1000:1000"
+    depends_on:
+      buildkitd:
+        condition: service_healthy
+    network_mode: none
+    entrypoint:
+      - /usr/bin/buildctl
+      - --addr
+      - unix:///run/user/1000/buildkit/buildkitd.sock
+    command: ["debug", "workers"]
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16777216
+    volumes:
+      - buildkit-socket:/run/user/1000/buildkit:ro
+      - ${DATA_DIR:-../data}/buildkit-proof:/proof
+
+  buildkit-proof-fixture:
+    profiles: ["buildkit-poc"]
+    image: moby/buildkit:v0.26.2-rootless@sha256:0ffa2fcf6b8757c47d569b3ef0f03f9d5eb3b9ff5ce68d858f994f89b749da0c
+    user: "0:0"
+    network_mode: none
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        rm -rf /proof/context /proof/output-network /proof/output-owner /proof/output-attacker
+        install -d -m 0750 /proof/context/rootfs/bin /proof/context/rootfs/lib
+        cp /fixture/Dockerfile.* /proof/context/
+        cp /bin/busybox /proof/context/rootfs/bin/busybox
+        cp /lib/ld-musl-x86_64.so.1 /proof/context/rootfs/lib/ld-musl-x86_64.so.1
+        ln -s ld-musl-x86_64.so.1 /proof/context/rootfs/lib/libc.musl-x86_64.so.1
+        chown -R 1000:1000 /proof
+        chmod 0700 /proof
+    read_only: true
+    volumes:
+      - ${APP_DIR:-..}/samples/buildkit-isolation:/fixture:ro
+      - ${DATA_DIR:-../data}/buildkit-proof:/proof
+
+  buildkit-control-plane-canary:
+    profiles: ["buildkit-poc"]
+    image: moby/buildkit:v0.26.2-rootless@sha256:0ffa2fcf6b8757c47d569b3ef0f03f9d5eb3b9ff5ce68d858f994f89b749da0c
+    entrypoint: ["/bin/busybox", "nc", "-lk", "-p", "8080", "-e", "/bin/cat"]
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "nc", "-z", "-w", "1", "127.0.0.1", "8080"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
   local-provider-sample:
     profiles: ["samples"]
     image: lrail-local-sample:dev
@@ -118,6 +226,8 @@ volumes:
   control-plane-tmp:
   local-provider-auth:
   local-provider-state:
+  buildkit-state:
+  buildkit-socket:
 
 networks:
   local-provider-docker:
@@ -125,4 +235,7 @@ networks:
     internal: true
   local-runtime:
     name: devpush_local_runtime
+    internal: true
+  buildkit-sandbox:
+    name: devpush_buildkit_sandbox
     internal: true

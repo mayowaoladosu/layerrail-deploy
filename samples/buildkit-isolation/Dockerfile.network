@@ -1,0 +1,9 @@
+FROM scratch AS isolation_probe
+COPY rootfs /
+ARG CONTROL_PLANE_IP
+ARG PROBE_NONCE
+ENV CONTROL_PLANE_IP=${CONTROL_PLANE_IP}
+RUN ["/bin/busybox", "sh", "-ec", "test -n \"$CONTROL_PLANE_IP\"; if /bin/busybox nc -z -w 2 169.254.169.254 80; then /bin/busybox echo 'cloud metadata became reachable' >&2; exit 41; fi; if /bin/busybox nc -z -w 2 \"$CONTROL_PLANE_IP\" 8080; then /bin/busybox echo 'control-plane canary became reachable' >&2; exit 42; fi; /bin/busybox echo network-isolated; /bin/busybox echo network-isolation-passed > /network-proof"]
+
+FROM scratch
+COPY --from=isolation_probe /network-proof /proof/result.txt
